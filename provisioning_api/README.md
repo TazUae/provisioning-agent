@@ -56,13 +56,13 @@ Optional tracing header (logged, not required):
 
 ### `read_site_db_name`
 
-Resolves the MariaDB database name for a site by reading that site’s configuration via **`frappe.utils.get_site_config`** (Frappe’s normal `site_config.json` resolution). No `bench` CLI, no shell, and no fake success responses.
+`site_name` is the **Frappe site name** (typically the multitenant hostname / site key), for example `erp.example.com` or `tenant1.erp.example.com`. Resolves the MariaDB database name by reading that site’s configuration via **`frappe.utils.get_site_config`** (Frappe’s normal `site_config.json` resolution). No `bench` CLI, no shell, and no fake success responses.
 
 **Request:** `POST` JSON body
 
 ```json
 {
-  "site_name": "my-site"
+  "site_name": "erp.example.com"
 }
 ```
 
@@ -72,7 +72,7 @@ Resolves the MariaDB database name for a site by reading that site’s configura
 {
   "ok": true,
   "data": {
-    "site_name": "my-site",
+    "site_name": "erp.example.com",
     "db_name": "_xxxxxxxxxxxxxxxx"
   }
 }
@@ -101,7 +101,7 @@ Creates or reuses a **Website User** with REST API credentials (`api_key` / `api
 
 ```json
 {
-  "site_name": "my-site",
+  "site_name": "erp.example.com",
   "api_username": "integration_user"
 }
 ```
@@ -112,9 +112,9 @@ Creates or reuses a **Website User** with REST API credentials (`api_key` / `api
 {
   "ok": true,
   "data": {
-    "site_name": "my-site",
+    "site_name": "erp.example.com",
     "api_username": "integration_user",
-    "user": "integration_user@my-site.local",
+    "user": "integration_user@erp.example.com",
     "api_key": "xxxxxxxxxxxxxxx",
     "api_secret": "xxxxxxxxxxxxxxx"
   }
@@ -200,7 +200,7 @@ On Windows, if `python` is not on `PATH`, use `py -3` instead of `python`.
 
 ## Assumptions and limitations
 
-- **Site name validation** matches `provisioning-agent` rules (lowercase alphanumeric + hyphen, length 3–50).
+- **Site name validation** accepts lowercase **hostname / FQDN** site names (DNS labels: letters, digits, interior hyphens; dots between labels), length 3–253, as used for Frappe DNS-based multitenant sites—not arbitrary free text.
 - **`api_username`** matches `provisioning-agent` username rules (lowercase after trim, 3–64 chars, `[a-z][a-z0-9_.-]{2,63}`).
 - **DB resolution** (`read_site_db_name`) relies on Frappe’s `get_site_config(site=...)` inside a normal request context (`frappe.local.sites_path` must be correct).
 - **Provisioning tokens** are compared with a constant-time digest check (SHA-256) so configured and submitted token lengths do not need to match.
