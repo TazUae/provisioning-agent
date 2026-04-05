@@ -10,7 +10,7 @@ from __future__ import annotations
 import frappe
 from frappe.utils import get_site_config
 
-from provisioning_api.access import check_provisioning_bearer, get_request_id
+from provisioning_api.access import check_provisioning_token_header, get_request_id
 from provisioning_api.api_user_email import build_api_user_email
 from provisioning_api.api_user_service import create_api_user_credentials
 from provisioning_api.api_username_validation import ApiUsernameValidationError, validate_api_username
@@ -57,7 +57,7 @@ def read_site_db_name(site_name: str | None = None) -> dict:
     Return the MariaDB database name for a bench site from site_config (via Frappe get_site_config).
 
     POST JSON: { "site_name": "..." }
-    Auth: Bearer token matching common_site_config `provisioning_api_token`.
+    Auth: ``X-Provisioning-Token`` matching common_site_config ``provisioning_api_token`` (not ``Authorization: Bearer``).
     """
     method = "read_site_db_name"
     req_id = get_request_id()
@@ -77,7 +77,7 @@ def read_site_db_name(site_name: str | None = None) -> dict:
         _set_http_status(400)
         return _error_envelope("VALIDATION_ERROR", str(e))
 
-    ok_auth, auth_code = check_provisioning_bearer()
+    ok_auth, auth_code = check_provisioning_token_header()
     if not ok_auth:
         log.warning(
             "%s auth_failed request_id=%s site_name=%s outcome=failure code=%s",
@@ -91,7 +91,7 @@ def read_site_db_name(site_name: str | None = None) -> dict:
         msg = (
             "Provisioning API token is not configured"
             if auth_code == "INTERNAL_ERROR"
-            else "Invalid or missing bearer token"
+            else "Invalid or missing X-Provisioning-Token header"
         )
         return _error_envelope(auth_code or "AUTH_ERROR", msg)
 
@@ -152,7 +152,7 @@ def create_api_user(site_name: str | None = None, api_username: str | None = Non
     Create or reuse a Website User with REST API credentials for this site.
 
     POST JSON: { "site_name": "...", "api_username": "..." }
-    Auth: Bearer token matching common_site_config `provisioning_api_token`.
+    Auth: ``X-Provisioning-Token`` matching common_site_config ``provisioning_api_token`` (not ``Authorization: Bearer``).
     """
     method = "create_api_user"
     req_id = get_request_id()
@@ -199,7 +199,7 @@ def create_api_user(site_name: str | None = None, api_username: str | None = Non
             "site_name must match the site handling this request",
         )
 
-    ok_auth, auth_code = check_provisioning_bearer()
+    ok_auth, auth_code = check_provisioning_token_header()
     if not ok_auth:
         log.warning(
             "%s auth_failed request_id=%s site_name=%s api_username=%s outcome=failure code=%s",
@@ -214,7 +214,7 @@ def create_api_user(site_name: str | None = None, api_username: str | None = Non
         msg = (
             "Provisioning API token is not configured"
             if auth_code == "INTERNAL_ERROR"
-            else "Invalid or missing bearer token"
+            else "Invalid or missing X-Provisioning-Token header"
         )
         return _error_envelope(auth_code or "AUTH_ERROR", msg)
 

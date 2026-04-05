@@ -29,9 +29,13 @@ Set a shared secret in **`sites/common_site_config.json`** (bench root):
 
 Restart bench / gunicorn after changing common site config.
 
-Clients must send:
+### Authentication (required)
 
-`Authorization: Bearer <same value as provisioning_api_token>`
+Clients must send the same value as `provisioning_api_token` in this **custom header**:
+
+`X-Provisioning-Token: <same value as provisioning_api_token>`
+
+**Do not** send this secret as `Authorization: Bearer …`. Frappe interprets `Authorization: Bearer` as **OAuth** bearer handling before this app’s code runs, which leads to **`401 AuthenticationError`** before `provisioning_api` can validate the internal token.
 
 Optional tracing header (logged, not required):
 
@@ -135,7 +139,7 @@ Use API authentication as documented in Frappe (e.g. `Authorization: token <api_
 | Code | HTTP | When |
 |------|------|------|
 | `VALIDATION_ERROR` | 400 | `site_name` / `api_username` invalid, or `site_name` does not match the site handling the request |
-| `AUTH_ERROR` | 401 | Missing/invalid `Authorization: Bearer` |
+| `AUTH_ERROR` | 401 | Missing/invalid `X-Provisioning-Token` (or wrong value vs `provisioning_api_token`) |
 | `INTERNAL_ERROR` | 500 / 503 | Misconfiguration (e.g. `provisioning_api_token` not set) or invalid site config shape |
 | `SITE_NOT_FOUND` | 404 | (`read_site_db_name`) Site cannot be resolved or `db_name` absent |
 | `USER_CREATION_FAILED` | 400 | User insert/load failed, disabled user, wrong `user_type` for existing email, etc. |
@@ -156,7 +160,7 @@ Use API authentication as documented in Frappe (e.g. `Authorization: token <api_
 
 ## Logging
 
-Structured log lines include method name, `site_name`, `api_username` (for `create_api_user`), optional request id, and success/failure. **`api_secret`**, **`Authorization`**, and bearer tokens are **not** logged.
+Structured log lines include method name, `site_name`, `api_username` (for `create_api_user`), optional request id, and success/failure. **`api_secret`**, **`X-Provisioning-Token`**, and **`Authorization`** values are **not** logged.
 
 ## Manual verification (example)
 
@@ -164,7 +168,7 @@ Replace host, site, token, and usernames. The request must go to the **same** si
 
 ```bash
 curl -sS -X POST "https://<your-erp-host>/api/method/provisioning_api.api.provisioning.create_api_user" \
-  -H "Authorization: Bearer <provisioning_api_token>" \
+  -H "X-Provisioning-Token: <provisioning_api_token>" \
   -H "Content-Type: application/json" \
   -H "X-Request-Id: manual-test-1" \
   -d "{\"site_name\":\"<same-as-site>\",\"api_username\":\"integration_user\"}"
@@ -174,7 +178,7 @@ curl -sS -X POST "https://<your-erp-host>/api/method/provisioning_api.api.provis
 
 ```bash
 curl -sS -X POST "https://<your-erp-host>/api/method/provisioning_api.api.provisioning.read_site_db_name" \
-  -H "Authorization: Bearer <provisioning_api_token>" \
+  -H "X-Provisioning-Token: <provisioning_api_token>" \
   -H "Content-Type: application/json" \
   -H "X-Request-Id: manual-test-1" \
   -d "{\"site_name\":\"<valid-site-name>\"}"
@@ -197,6 +201,6 @@ On Windows, if `python` is not on `PATH`, use `py -3` instead of `python`.
 - **Site name validation** matches `provisioning-agent` rules (lowercase alphanumeric + hyphen, length 3–50).
 - **`api_username`** matches `provisioning-agent` username rules (lowercase after trim, 3–64 chars, `[a-z][a-z0-9_.-]{2,63}`).
 - **DB resolution** (`read_site_db_name`) relies on Frappe’s `get_site_config(site=...)` inside a normal request context (`frappe.local.sites_path` must be correct).
-- **Bearer tokens** are compared with a constant-time digest check (SHA-256) so client and configured token lengths do not need to match.
+- **Provisioning tokens** are compared with a constant-time digest check (SHA-256) so configured and submitted token lengths do not need to match.
 - **`create_api_user`** only affects the **current site’s** database; `site_name` must match the active request site.
 - **Website User** + token auth is minimal; if your integration requires extra roles for specific ERPNext endpoints, grant them deliberately in Desk (outside this automated path).
