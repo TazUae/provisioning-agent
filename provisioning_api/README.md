@@ -37,6 +37,8 @@ Clients must send the same value as `provisioning_api_token` in this **custom he
 
 **Do not** send this secret as `Authorization: Bearer …`. Frappe interprets `Authorization: Bearer` as **OAuth** bearer handling before this app’s code runs, which leads to **`401 AuthenticationError`** before `provisioning_api` can validate the internal token.
 
+Internal provisioning RPCs are decorated with **`@frappe.whitelist(allow_guest=True, …)`** so callers can use `POST /api/method/...` **without a logged-in Frappe session** (the request runs as Guest at the framework layer). That is only safe because **authentication is not left open**: every implemented method calls **`check_provisioning_token_header()`**, which requires **`X-Provisioning-Token`** to match **`provisioning_api_token`** in `common_site_config.json`. These endpoints are **not** public; they remain protected by that shared secret.
+
 Optional tracing header (logged, not required):
 
 `X-Request-Id: <correlation-id>`
