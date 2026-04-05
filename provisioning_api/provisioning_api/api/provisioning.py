@@ -3,6 +3,11 @@ Whitelisted provisioning methods.
 
 Implemented: read_site_db_name, create_api_user
 Stubbed: create_site, install_erp, enable_scheduler, add_domain
+
+Every RPC below uses ``@frappe.whitelist(methods=["POST"], allow_guest=True)`` so
+``POST /api/method/...`` works without a logged-in Frappe user. Access is enforced
+in-method by ``require_provisioning_access()`` (``X-Provisioning-Token`` vs
+``provisioning_api_token`` in ``common_site_config.json``), not by session auth.
 """
 
 from __future__ import annotations
