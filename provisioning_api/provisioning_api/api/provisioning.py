@@ -10,7 +10,7 @@ from __future__ import annotations
 import frappe
 from frappe.utils import get_site_config
 
-from provisioning_api.access import check_provisioning_token_header, get_request_id
+from provisioning_api.access import get_request_id, require_provisioning_access
 from provisioning_api.api_user_email import build_api_user_email
 from provisioning_api.api_user_service import create_api_user_credentials
 from provisioning_api.api_username_validation import ApiUsernameValidationError, validate_api_username
@@ -77,7 +77,7 @@ def read_site_db_name(site_name: str | None = None) -> dict:
         _set_http_status(400)
         return _error_envelope("VALIDATION_ERROR", str(e))
 
-    ok_auth, auth_code = check_provisioning_token_header()
+    ok_auth, auth_code = require_provisioning_access()
     if not ok_auth:
         log.warning(
             "%s auth_failed request_id=%s site_name=%s outcome=failure code=%s",
@@ -199,7 +199,7 @@ def create_api_user(site_name: str | None = None, api_username: str | None = Non
             "site_name must match the site handling this request",
         )
 
-    ok_auth, auth_code = check_provisioning_token_header()
+    ok_auth, auth_code = require_provisioning_access()
     if not ok_auth:
         log.warning(
             "%s auth_failed request_id=%s site_name=%s api_username=%s outcome=failure code=%s",

@@ -57,3 +57,16 @@ def check_provisioning_token_header() -> tuple[bool, str | None]:
         return False, "AUTH_ERROR"
 
     return True, None
+
+
+def require_provisioning_access() -> tuple[bool, str | None]:
+    """
+    Authorize internal provisioning RPCs using **only** ``X-Provisioning-Token``.
+
+    Does **not** require a Frappe web session, API key/secret, or a logged-in
+    non-Guest user. This function does **not** call ``require_api_auth`` or any
+    other Frappe helper that enforces logged-in user / API-token auth.
+
+    Returns the same ``(ok, error_code)`` as :func:`check_provisioning_token_header`.
+    """
+    return check_provisioning_token_header()
