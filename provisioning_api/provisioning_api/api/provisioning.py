@@ -8,14 +8,13 @@ Stubbed: create_site, install_erp, enable_scheduler, add_domain
 from __future__ import annotations
 
 import frappe
-from frappe.utils import get_site_config
 
 from provisioning_api.access import get_request_id, require_provisioning_access
 from provisioning_api.api_user_email import build_api_user_email
 from provisioning_api.api_user_service import create_api_user_credentials
 from provisioning_api.api_username_validation import ApiUsernameValidationError, validate_api_username
 from provisioning_api.request_site import site_matches_request
-from provisioning_api.site_db import resolve_db_name_with
+from provisioning_api.site_db import resolve_db_name_from_filesystem
 from provisioning_api.site_validation import SiteValidationError, validate_site_name
 
 
@@ -54,7 +53,9 @@ def _validate_site_matches_request(safe_site: str) -> tuple[bool, str | None]:
 @frappe.whitelist(methods=["POST"], allow_guest=True)
 def read_site_db_name(site_name: str | None = None) -> dict:
     """
-    Return the MariaDB database name for a bench site from site_config (via Frappe get_site_config).
+    Return the MariaDB database name for a bench site by reading ``site_config.json`` on disk.
+
+    Read-only: resolves ``<sites_path>/<site_name>/site_config.json``, extracts ``db_name`` only.
 
     POST JSON: { "site_name": "..." }
     Auth: ``X-Provisioning-Token`` matching common_site_config ``provisioning_api_token`` (not ``Authorization: Bearer``).
@@ -95,9 +96,20 @@ def read_site_db_name(site_name: str | None = None) -> dict:
         )
         return _error_envelope(auth_code or "AUTH_ERROR", msg)
 
-    db_name, err = resolve_db_name_with(safe_site, get_site_config=get_site_config)
+    sites_path = getattr(frappe.local, "sites_path", None)
+    if not sites_path:
+        log.error(
+            "%s internal_error request_id=%s site_name=%s outcome=failure reason=sites_path_unavailable",
+            method,
+            req_id or "-",
+            safe_site,
+        )
+        _set_http_status(500)
+        return _error_envelope("INTERNAL_ERROR", "Sites path is not available in this request context")
 
-    if err == "SITE_NOT_FOUND" or not db_name:
+    db_name, err = resolve_db_name_from_filesystem(sites_path, safe_site)
+
+    if err == "SITE_NOT_FOUND":
         log.info(
             "%s site_not_found request_id=%s site_name=%s outcome=failure",
             method,
@@ -105,9 +117,29 @@ def read_site_db_name(site_name: str | None = None) -> dict:
             safe_site,
         )
         _set_http_status(404)
-        return _error_envelope("SITE_NOT_FOUND", "Site could not be resolved or has no db_name")
+        return _error_envelope("SITE_NOT_FOUND", "Site directory does not exist under the bench sites folder")
 
-    if err == "INTERNAL_ERROR":
+    if err == "SITE_CONFIG_MISSING":
+        log.warning(
+            "%s site_config_missing request_id=%s site_name=%s outcome=failure",
+            method,
+            req_id or "-",
+            safe_site,
+        )
+        _set_http_status(500)
+        return _error_envelope("SITE_CONFIG_MISSING", "site_config.json is missing for this site")
+
+    if err == "DB_NAME_MISSING":
+        log.warning(
+            "%s db_name_missing request_id=%s site_name=%s outcome=failure",
+            method,
+            req_id or "-",
+            safe_site,
+        )
+        _set_http_status(500)
+        return _error_envelope("DB_NAME_MISSING", "db_name is missing or empty in site_config.json")
+
+    if err == "INTERNAL_ERROR" or not db_name:
         log.error(
             "%s internal_error request_id=%s site_name=%s outcome=failure",
             method,
@@ -115,7 +147,7 @@ def read_site_db_name(site_name: str | None = None) -> dict:
             safe_site,
         )
         _set_http_status(500)
-        return _error_envelope("INTERNAL_ERROR", "Invalid site configuration")
+        return _error_envelope("INTERNAL_ERROR", "Could not read site configuration")
 
     log.info(
         "%s success request_id=%s site_name=%s outcome=ok",

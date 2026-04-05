@@ -1,49 +1,89 @@
-"""Unit tests for DB name resolution helper (mocked get_site_config)."""
+"""Unit tests for filesystem db_name resolution (tmp dirs, no Frappe runtime)."""
 
 from __future__ import annotations
 
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from provisioning_api.site_db import resolve_db_name_with
+from provisioning_api.site_db import resolve_db_name_from_filesystem
 
 
-class TestSiteDb(unittest.TestCase):
-    def test_site_found_returns_db_name(self) -> None:
-        def fake(site: str | None = None, **_kwargs):
-            self.assertEqual(site, "abc-site")
-            return {"db_name": "_abc123"}
+class TestResolveDbNameFromFilesystem(unittest.TestCase):
+    def test_success_reads_db_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            site = root / "erp.example.com"
+            site.mkdir(parents=True)
+            (site / "site_config.json").write_text(
+                json.dumps({"db_name": "_some_db", "db_password": "secret"}),
+                encoding="utf-8",
+            )
 
-        db, err = resolve_db_name_with("abc-site", get_site_config=fake)
-        self.assertIsNone(err)
-        self.assertEqual(db, "_abc123")
+            db, err = resolve_db_name_from_filesystem(root, "erp.example.com")
+            self.assertIsNone(err)
+            self.assertEqual(db, "_some_db")
 
-    def test_site_missing_returns_site_not_found(self) -> None:
-        def boom(**_kwargs):
-            raise OSError("no such site")
+    def test_missing_site_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
 
-        db, err = resolve_db_name_with("missing", get_site_config=boom)
-        self.assertIsNone(db)
-        self.assertEqual(err, "SITE_NOT_FOUND")
+            db, err = resolve_db_name_from_filesystem(root, "missing.example.com")
+            self.assertIsNone(db)
+            self.assertEqual(err, "SITE_NOT_FOUND")
 
-    def test_empty_db_name_returns_site_not_found(self) -> None:
-        def fake(**_kwargs):
-            return {"db_name": "   "}
+    def test_missing_site_config_json(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            site = root / "erp.example.com"
+            site.mkdir(parents=True)
 
-        db, err = resolve_db_name_with("x", get_site_config=fake)
-        self.assertIsNone(db)
-        self.assertEqual(err, "SITE_NOT_FOUND")
+            db, err = resolve_db_name_from_filesystem(root, "erp.example.com")
+            self.assertIsNone(db)
+            self.assertEqual(err, "SITE_CONFIG_MISSING")
 
-    def test_non_dict_config_returns_internal_error(self) -> None:
-        def fake(**_kwargs):
-            return "bad"
+    def test_missing_db_name_in_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            site = root / "erp.example.com"
+            site.mkdir(parents=True)
+            (site / "site_config.json").write_text(
+                json.dumps({"db_password": "x"}),
+                encoding="utf-8",
+            )
 
-        db, err = resolve_db_name_with("x", get_site_config=fake)
-        self.assertIsNone(db)
-        self.assertEqual(err, "INTERNAL_ERROR")
+            db, err = resolve_db_name_from_filesystem(root, "erp.example.com")
+            self.assertIsNone(db)
+            self.assertEqual(err, "DB_NAME_MISSING")
+
+    def test_empty_db_name_in_config(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            site = root / "erp.example.com"
+            site.mkdir(parents=True)
+            (site / "site_config.json").write_text(
+                json.dumps({"db_name": "   "}),
+                encoding="utf-8",
+            )
+
+            db, err = resolve_db_name_from_filesystem(root, "erp.example.com")
+            self.assertIsNone(db)
+            self.assertEqual(err, "DB_NAME_MISSING")
+
+    def test_invalid_json_returns_internal_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            site = root / "erp.example.com"
+            site.mkdir(parents=True)
+            (site / "site_config.json").write_text("{not json", encoding="utf-8")
+
+            db, err = resolve_db_name_from_filesystem(root, "erp.example.com")
+            self.assertIsNone(db)
+            self.assertEqual(err, "INTERNAL_ERROR")
 
 
 if __name__ == "__main__":

@@ -56,7 +56,9 @@ Optional tracing header (logged, not required):
 
 ### `read_site_db_name`
 
-`site_name` is the **Frappe site name** (typically the multitenant hostname / site key), for example `erp.example.com` or `tenant1.erp.example.com`. Resolves the MariaDB database name by reading that site’s configuration via **`frappe.utils.get_site_config`** (Frappe’s normal `site_config.json` resolution). No `bench` CLI, no shell, and no fake success responses.
+**Implemented:** read-only lookup of the MariaDB database name for a site.
+
+`site_name` is the **Frappe site name** (typically the multitenant hostname / site key), for example `erp.example.com` or `tenant1.erp.example.com`. The app resolves ``<bench>/sites/<site_name>/site_config.json`` using **`frappe.local.sites_path`**, reads JSON only (no shell, no `bench` commands), and returns the **`db_name`** field. **`db_password`** is never read into the response. No writes are performed.
 
 **Request:** `POST` JSON body
 
@@ -142,8 +144,10 @@ Use API authentication as documented in Frappe (e.g. `Authorization: token <api_
 |------|------|------|
 | `VALIDATION_ERROR` | 400 | `site_name` / `api_username` invalid, or `site_name` does not match the site handling the request |
 | `AUTH_ERROR` | 401 | Missing/invalid `X-Provisioning-Token` (or wrong value vs `provisioning_api_token`) |
-| `INTERNAL_ERROR` | 500 / 503 | Misconfiguration (e.g. `provisioning_api_token` not set) or invalid site config shape |
-| `SITE_NOT_FOUND` | 404 | (`read_site_db_name`) Site cannot be resolved or `db_name` absent |
+| `INTERNAL_ERROR` | 500 / 503 | Misconfiguration (e.g. `provisioning_api_token` not set), unreadable `sites_path`, or invalid/unreadable `site_config.json` |
+| `SITE_NOT_FOUND` | 404 | (`read_site_db_name`) No site directory under the bench `sites` folder |
+| `SITE_CONFIG_MISSING` | 500 | (`read_site_db_name`) Site folder exists but `site_config.json` is missing |
+| `DB_NAME_MISSING` | 500 | (`read_site_db_name`) `site_config.json` has no non-empty `db_name` |
 | `USER_CREATION_FAILED` | 400 | User insert/load failed, disabled user, wrong `user_type` for existing email, etc. |
 | `API_KEY_GENERATION_FAILED` | 500 | Saving API credentials failed |
 | `NOT_IMPLEMENTED` | 501 | Stub methods only |
@@ -202,7 +206,7 @@ On Windows, if `python` is not on `PATH`, use `py -3` instead of `python`.
 
 - **Site name validation** accepts lowercase **hostname / FQDN** site names (DNS labels: letters, digits, interior hyphens; dots between labels), length 3–253, as used for Frappe DNS-based multitenant sites—not arbitrary free text.
 - **`api_username`** matches `provisioning-agent` username rules (lowercase after trim, 3–64 chars, `[a-z][a-z0-9_.-]{2,63}`).
-- **DB resolution** (`read_site_db_name`) relies on Frappe’s `get_site_config(site=...)` inside a normal request context (`frappe.local.sites_path` must be correct).
+- **DB resolution** (`read_site_db_name`) reads ``<sites_path>/<site_name>/site_config.json`` on disk (`frappe.local.sites_path` must be set in the request context).
 - **Provisioning tokens** are compared with a constant-time digest check (SHA-256) so configured and submitted token lengths do not need to match.
 - **`create_api_user`** only affects the **current site’s** database; `site_name` must match the active request site.
 - **Website User** + token auth is minimal; if your integration requires extra roles for specific ERPNext endpoints, grant them deliberately in Desk (outside this automated path).
