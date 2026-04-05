@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from provisioning_api.site_db import resolve_db_name_from_filesystem
+from provisioning_api.utils.site_db import resolve_db_name_from_filesystem
 
 
 class TestResolveDbNameFromFilesystem(unittest.TestCase):

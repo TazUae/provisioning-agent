@@ -7,6 +7,8 @@ import hmac
 
 import frappe
 
+from provisioning_api.config import PROVISIONING_TOKEN_KEY
+
 # Canonical header for the internal provisioning secret (not OAuth / not Authorization: Bearer).
 PROVISIONING_TOKEN_HEADER = "X-Provisioning-Token"
 
@@ -45,7 +47,7 @@ def check_provisioning_token_header() -> tuple[bool, str | None]:
     Returns (ok, error_code) where error_code is AUTH_ERROR or INTERNAL_ERROR.
     """
     config = frappe.get_common_site_config()
-    expected = (config or {}).get("provisioning_api_token")
+    expected = (config or {}).get(PROVISIONING_TOKEN_KEY)
     if not expected or not isinstance(expected, str):
         return False, "INTERNAL_ERROR"
 

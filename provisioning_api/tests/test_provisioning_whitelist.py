@@ -23,6 +23,7 @@ def _install_frappe_whitelist_mock() -> None:
 
     # Real module objects so ``from frappe.utils import get_site_config`` works.
     frappe_mod = types.ModuleType("frappe")
+    frappe_mod.__path__ = []  # treat as package so ``frappe.exceptions`` can load
     frappe_mod.whitelist = whitelist
     frappe_mod.logger = MagicMock(return_value=MagicMock())
     frappe_mod.local = MagicMock()
@@ -30,7 +31,20 @@ def _install_frappe_whitelist_mock() -> None:
     frappe_mod.form_dict = {}
     frappe_mod.get_site_name = MagicMock(return_value="test-site")
     frappe_mod.get_request_header = MagicMock(return_value="")
+    frappe_mod.throw = MagicMock(side_effect=RuntimeError("throw"))
     sys.modules["frappe"] = frappe_mod
+
+    exc_mod = types.ModuleType("frappe.exceptions")
+
+    class ValidationError(Exception):
+        pass
+
+    class PermissionError(Exception):
+        pass
+
+    exc_mod.ValidationError = ValidationError
+    exc_mod.PermissionError = PermissionError
+    sys.modules["frappe.exceptions"] = exc_mod
 
     utils_mod = types.ModuleType("frappe.utils")
     utils_mod.get_site_config = MagicMock()

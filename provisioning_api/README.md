@@ -37,7 +37,7 @@ Clients must send the same value as `provisioning_api_token` in this **custom he
 
 **Do not** send this secret as `Authorization: Bearer …`. Frappe interprets `Authorization: Bearer` as **OAuth** bearer handling before this app’s code runs, which leads to **`401 AuthenticationError`** before `provisioning_api` can validate the internal token.
 
-Internal provisioning RPCs are **guest-callable at the Frappe layer** (`@frappe.whitelist(allow_guest=True, …)`): callers use `POST /api/method/...` **without** a logged-in Desk user or API key session. **No logged-in Frappe user is required** for this internal flow. Actual protection is **`require_provisioning_access()`**, which validates **`X-Provisioning-Token`** against **`provisioning_api_token`** in `common_site_config.json` only (no `require_api_auth` / session checks). These endpoints are **not** public; they remain protected by that shared secret.
+Internal provisioning RPCs are **guest-callable at the Frappe layer** (`@frappe.whitelist(allow_guest=True, …)`): callers use `POST /api/method/...` **without** a logged-in Desk user or API key session. **No logged-in Frappe user is required** for this internal flow. Every method calls **`verify_token()`** in `provisioning_api.auth`, which validates **`X-Provisioning-Token`** against **`provisioning_api_token`** in `common_site_config.json` (constant-time compare via `check_provisioning_token_header` in `access.py`). There is **no** reliance on Frappe session auth. These endpoints are **not** public; they remain protected by that shared secret.
 
 Optional tracing header (logged, not required):
 
@@ -68,17 +68,19 @@ Optional tracing header (logged, not required):
 }
 ```
 
-**Success envelope** (returned as Frappe `message`; see below):
+**Success response** (typically nested under Frappe’s `message` key):
 
 ```json
 {
-  "ok": true,
+  "success": true,
   "data": {
     "site_name": "erp.example.com",
     "db_name": "_xxxxxxxxxxxxxxxx"
   }
 }
 ```
+
+**Errors** use **`frappe.throw`** (no custom `{ ok: false, error: {…} }` envelope). Typical cases: missing/invalid token (`PermissionError`), validation (`ValidationError`), missing site/config/db_name (`ValidationError` with appropriate HTTP status set where applicable).
 
 ### `create_api_user`
 
@@ -108,11 +110,11 @@ Creates or reuses a **Website User** with REST API credentials (`api_key` / `api
 }
 ```
 
-**Success envelope:**
+**Success response:**
 
 ```json
 {
-  "ok": true,
+  "success": true,
   "data": {
     "site_name": "erp.example.com",
     "api_username": "integration_user",
@@ -130,7 +132,7 @@ When credentials were **already** issued earlier, `api_secret` is JSON **`null`*
 ```json
 {
   "message": {
-    "ok": true,
+    "success": true,
     "data": { "site_name": "...", "api_username": "...", "user": "...", "api_key": "...", "api_secret": "..." }
   }
 }
@@ -138,31 +140,19 @@ When credentials were **already** issued earlier, `api_secret` is JSON **`null`*
 
 Use API authentication as documented in Frappe (e.g. `Authorization: token <api_key>:<api_secret>`).
 
-## Failure codes (`error.code`)
+## Errors
 
-| Code | HTTP | When |
-|------|------|------|
-| `VALIDATION_ERROR` | 400 | `site_name` / `api_username` invalid, or `site_name` does not match the site handling the request |
-| `AUTH_ERROR` | 401 | Missing/invalid `X-Provisioning-Token` (or wrong value vs `provisioning_api_token`) |
-| `INTERNAL_ERROR` | 500 / 503 | Misconfiguration (e.g. `provisioning_api_token` not set), unreadable `sites_path`, or invalid/unreadable `site_config.json` |
-| `SITE_NOT_FOUND` | 404 | (`read_site_db_name`) No site directory under the bench `sites` folder |
-| `SITE_CONFIG_MISSING` | 500 | (`read_site_db_name`) Site folder exists but `site_config.json` is missing |
-| `DB_NAME_MISSING` | 500 | (`read_site_db_name`) `site_config.json` has no non-empty `db_name` |
-| `USER_CREATION_FAILED` | 400 | User insert/load failed, disabled user, wrong `user_type` for existing email, etc. |
-| `API_KEY_GENERATION_FAILED` | 500 | Saving API credentials failed |
-| `NOT_IMPLEMENTED` | 501 | Stub methods only |
+Failures are returned via **`frappe.throw`** (Frappe’s standard exception response), not a custom `{ ok: false, error: { code } }` JSON body. Typical cases:
 
-**Error envelope:**
-
-```json
-{
-  "ok": false,
-  "error": {
-    "code": "USER_CREATION_FAILED",
-    "message": "Could not create or load User"
-  }
-}
-```
+| Situation | HTTP (typical) | Notes |
+|-----------|----------------|--------|
+| Missing/invalid `X-Provisioning-Token` | 403 / 401 | `PermissionError` from `verify_token()` |
+| Token not configured on server | 500 / 503 | `Provisioning API token is not configured` |
+| Invalid `site_name` / `api_username` / site mismatch | 400 | `ValidationError` |
+| Site directory missing (`read_site_db_name`) | 404 | `ValidationError` (“Site not found: …”) |
+| Missing `site_config.json` or `db_name` | 500 | `ValidationError` with message describing the problem |
+| `create_api_user` user/key errors | 400 / 500 | `ValidationError` with service message |
+| Stub methods | 501 | `ValidationError` (“… not implemented yet”) |
 
 ## Logging
 
@@ -190,7 +180,7 @@ curl -sS -X POST "https://<your-erp-host>/api/method/provisioning_api.api.provis
   -d "{\"site_name\":\"<valid-site-name>\"}"
 ```
 
-Expect `message.ok === true` and `message.data` as documented.
+Expect `message.success === true` and `message.data` as documented.
 
 ## Tests (no Frappe runtime)
 
