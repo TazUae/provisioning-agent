@@ -11,10 +11,10 @@
 - `createApiUser`
 - `healthCheck`
 
-Backend selection is controlled by `ERP_EXECUTION_BACKEND`:
+Backend selection is controlled by `ERP_EXECUTION_BACKEND` (see `src/config/env.ts`):
 
-- `docker` (default): `DockerExecBackend` — **temporary** compatibility bridge only.
-- `remote`: `RemoteErpBackend` calls the ERP-side **`erp-execution-service`** (`POST /v1/erp/lifecycle`, typed contract in `remote-contract.ts`). Configure `ERP_REMOTE_BASE_URL`, `ERP_REMOTE_TOKEN`, and optional `ERP_REMOTE_TIMEOUT_MS`.
+- **`remote`** — **production** target: `RemoteErpBackend` calls the ERP-side **`erp-execution-service`** (`POST /v1/erp/lifecycle`, typed contract in `remote-contract.ts`). Requires `ERP_REMOTE_BASE_URL`, `ERP_REMOTE_TOKEN`, and optional `ERP_REMOTE_TIMEOUT_MS`. In `NODE_ENV=production`, if `ERP_EXECUTION_BACKEND` is unset, the backend defaults to **`remote`**.
+- **`docker`** — dev/test bridge: `DockerExecBackend` — **temporary** compatibility only; needs Docker CLI on the host. In `development`/`test`, if unset, defaults to **`docker`**. In `NODE_ENV=production`, docker requires `ERP_DOCKER_ALLOW_IN_PRODUCTION=true`.
 
 ## Important constraints
 
@@ -53,5 +53,5 @@ Raw command stdout/stderr stay internal.
 2. Keep queue/worker/state-machine flow unchanged.
 3. Deploy **`erp-execution-service`** on the ERP side (see [`docs/erp-side-execution-service.md`](../../docs/erp-side-execution-service.md)).
 4. `RemoteErpBackend` in this repo already targets that contract; set `ERP_REMOTE_BASE_URL` / `ERP_REMOTE_TOKEN` / `ERP_REMOTE_TIMEOUT_MS`.
-5. Flip `ERP_EXECUTION_BACKEND=remote` per environment when ready (default remains `docker` until you explicitly change it).
+5. Set `ERP_EXECUTION_BACKEND=remote` in production (or rely on production default `remote` when unset); non-production defaults to `docker` when unset.
 6. Remove `DockerExecBackend` only after successful rollout and validation.

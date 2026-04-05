@@ -26,7 +26,7 @@ app.setErrorHandler((error, _req, reply) => {
   sendFailure(reply, typed);
 });
 
-await registerHealthRoutes(app);
+await registerHealthRoutes(app, { erpBackend });
 await registerSiteRoutes(app, service);
 
 app.listen({ port: env.PORT, host: "0.0.0.0" })

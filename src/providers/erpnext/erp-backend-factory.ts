@@ -5,7 +5,8 @@ import type { ErpExecutionBackend } from "./erp-execution-backend.js";
 
 /**
  * Selects the ERP execution backend from `ERP_EXECUTION_BACKEND`.
- * Default remains Docker for backward-compatible deployments.
+ * In production, the default is `remote` when unset; in development/test, `docker` when unset.
+ * See `src/config/env.ts` and README for required variables per mode.
  */
 export function createErpExecutionBackend(
   backendName: "docker" | "remote" = env.ERP_EXECUTION_BACKEND

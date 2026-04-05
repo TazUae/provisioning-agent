@@ -17,9 +17,10 @@ import type {
 } from "./erp-execution-backend.js";
 
 /**
- * Temporary bridge backend when `ERP_EXECUTION_BACKEND=docker` (default): allowlisted bench operations
- * via `docker exec` into `ERP_CONTAINER_NAME`.
- * This is not the final production architecture and must be replaced by ERP-side execution.
+ * Dev/test bridge when `ERP_EXECUTION_BACKEND=docker`: allowlisted bench operations via `docker exec`
+ * into `ERP_CONTAINER_NAME`. Requires Docker CLI and socket access on the host — not available in the
+ * default slim container image. Production uses `remote`; docker in production requires
+ * `ERP_DOCKER_ALLOW_IN_PRODUCTION=true`.
  * Do not add generic exec passthrough here.
  */
 export class DockerExecBackend implements ErpExecutionBackend {
