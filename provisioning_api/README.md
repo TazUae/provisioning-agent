@@ -42,11 +42,11 @@ Optional tracing header (logged, not required):
 | Dotted path | Status |
 |-------------|--------|
 | `provisioning_api.api.provisioning.read_site_db_name` | **Implemented** |
+| `provisioning_api.api.provisioning.create_api_user` | **Implemented** |
 | `provisioning_api.api.provisioning.create_site` | Stub (`NOT_IMPLEMENTED`, HTTP 501) |
 | `provisioning_api.api.provisioning.install_erp` | Stub |
 | `provisioning_api.api.provisioning.enable_scheduler` | Stub |
 | `provisioning_api.api.provisioning.add_domain` | Stub |
-| `provisioning_api.api.provisioning.create_api_user` | Stub |
 
 ### `read_site_db_name`
 
@@ -72,25 +72,74 @@ Resolves the MariaDB database name for a site by reading that site’s configura
 }
 ```
 
+### `create_api_user`
+
+Creates or reuses a **Website User** with REST API credentials (`api_key` / `api_secret`) for **the site that is handling the HTTP request**. The caller must send `site_name` equal to **`frappe.get_site_name()`** for that request (same site as the Host / site context). Operations use normal Frappe `User` document APIs and the same key assignment pattern as Frappe’s `generate_keys` (no bench, no shell).
+
+**Role model (least privilege):**
+
+- New users are created with **`user_type` = `Website User`** and **only** the **`Website User`** role (standard Frappe role). No System Manager, Administrator, or broad desk roles are granted by this method.
+- If a User with the same derived email already exists with **another** `user_type`, the call fails with `USER_CREATION_FAILED` (email collision).
+- If an existing Website User is missing the `Website User` role, it is appended before key handling.
+
+**Derived email (User `name` / `email`):**
+
+- `api_username@<site_domain>` where `<site_domain>` is `site_name` if it contains a dot, otherwise `<site_name>.local` (e.g. `apiuser@abc-site.local`).
+
+**Idempotency / secrets:**
+
+- **First time** (new user, or existing user **without** `api_key`): generates `api_key` and `api_secret`; **returns both** (plain `api_secret` only at issuance—same rule as Frappe UI “Generate Keys”).
+- **Subsequent calls** when `api_key` **already exists**: **does not rotate** keys. Returns **`api_key`** and **`api_secret`: `null`** because the secret is stored as a **Password** field and cannot be read back from the database. Callers must store the secret from the first successful `issued` response.
+
+**Request:** `POST` JSON body
+
+```json
+{
+  "site_name": "my-site",
+  "api_username": "integration_user"
+}
+```
+
+**Success envelope:**
+
+```json
+{
+  "ok": true,
+  "data": {
+    "site_name": "my-site",
+    "api_username": "integration_user",
+    "user": "integration_user@my-site.local",
+    "api_key": "xxxxxxxxxxxxxxx",
+    "api_secret": "xxxxxxxxxxxxxxx"
+  }
+}
+```
+
+When credentials were **already** issued earlier, `api_secret` is JSON **`null`** (see idempotency above).
+
 **Frappe HTTP wrapper:** the JSON above is typically nested under `message` in the HTTP response body, for example:
 
 ```json
 {
   "message": {
     "ok": true,
-    "data": { "site_name": "my-site", "db_name": "_xxxxxxxxxxxxxxxx" }
+    "data": { "site_name": "...", "api_username": "...", "user": "...", "api_key": "...", "api_secret": "..." }
   }
 }
 ```
+
+Use API authentication as documented in Frappe (e.g. `Authorization: token <api_key>:<api_secret>`).
 
 ## Failure codes (`error.code`)
 
 | Code | HTTP | When |
 |------|------|------|
-| `VALIDATION_ERROR` | 400 | `site_name` missing or invalid (3–50 chars, `a-z`, `0-9`, `-`) |
+| `VALIDATION_ERROR` | 400 | `site_name` / `api_username` invalid, or `site_name` does not match the site handling the request |
 | `AUTH_ERROR` | 401 | Missing/invalid `Authorization: Bearer` |
 | `INTERNAL_ERROR` | 500 / 503 | Misconfiguration (e.g. `provisioning_api_token` not set) or invalid site config shape |
-| `SITE_NOT_FOUND` | 404 | Site cannot be resolved or `db_name` absent in config |
+| `SITE_NOT_FOUND` | 404 | (`read_site_db_name`) Site cannot be resolved or `db_name` absent |
+| `USER_CREATION_FAILED` | 400 | User insert/load failed, disabled user, wrong `user_type` for existing email, etc. |
+| `API_KEY_GENERATION_FAILED` | 500 | Saving API credentials failed |
 | `NOT_IMPLEMENTED` | 501 | Stub methods only |
 
 **Error envelope:**
@@ -99,19 +148,29 @@ Resolves the MariaDB database name for a site by reading that site’s configura
 {
   "ok": false,
   "error": {
-    "code": "SITE_NOT_FOUND",
-    "message": "Site could not be resolved or has no db_name"
+    "code": "USER_CREATION_FAILED",
+    "message": "Could not create or load User"
   }
 }
 ```
 
 ## Logging
 
-Structured log lines include method name, `site_name`, optional request id, and success/failure. Secrets and bearer tokens are **not** logged.
+Structured log lines include method name, `site_name`, `api_username` (for `create_api_user`), optional request id, and success/failure. **`api_secret`**, **`Authorization`**, and bearer tokens are **not** logged.
 
 ## Manual verification (example)
 
-Replace host, site, and token. Use a real site name that exists on the bench.
+Replace host, site, token, and usernames. The request must go to the **same** site as `site_name`.
+
+```bash
+curl -sS -X POST "https://<your-erp-host>/api/method/provisioning_api.api.provisioning.create_api_user" \
+  -H "Authorization: Bearer <provisioning_api_token>" \
+  -H "Content-Type: application/json" \
+  -H "X-Request-Id: manual-test-1" \
+  -d "{\"site_name\":\"<same-as-site>\",\"api_username\":\"integration_user\"}"
+```
+
+`read_site_db_name` example:
 
 ```bash
 curl -sS -X POST "https://<your-erp-host>/api/method/provisioning_api.api.provisioning.read_site_db_name" \
@@ -121,7 +180,7 @@ curl -sS -X POST "https://<your-erp-host>/api/method/provisioning_api.api.provis
   -d "{\"site_name\":\"<valid-site-name>\"}"
 ```
 
-Expect `message.ok === true` and `message.data.db_name` matching the site’s `db_name` in `sites/<site>/site_config.json`.
+Expect `message.ok === true` and `message.data` as documented.
 
 ## Tests (no Frappe runtime)
 
@@ -136,5 +195,8 @@ On Windows, if `python` is not on `PATH`, use `py -3` instead of `python`.
 ## Assumptions and limitations
 
 - **Site name validation** matches `provisioning-agent` rules (lowercase alphanumeric + hyphen, length 3–50).
-- **DB resolution** relies on Frappe’s `get_site_config(site=...)` inside a normal request context (`frappe.local.sites_path` must be correct). If that context is wrong, resolution may fail with `INTERNAL_ERROR` or `SITE_NOT_FOUND`.
+- **`api_username`** matches `provisioning-agent` username rules (lowercase after trim, 3–64 chars, `[a-z][a-z0-9_.-]{2,63}`).
+- **DB resolution** (`read_site_db_name`) relies on Frappe’s `get_site_config(site=...)` inside a normal request context (`frappe.local.sites_path` must be correct).
 - **Bearer tokens** are compared with a constant-time digest check (SHA-256) so client and configured token lengths do not need to match.
+- **`create_api_user`** only affects the **current site’s** database; `site_name` must match the active request site.
+- **Website User** + token auth is minimal; if your integration requires extra roles for specific ERPNext endpoints, grant them deliberately in Desk (outside this automated path).
