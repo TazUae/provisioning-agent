@@ -57,7 +57,7 @@ Set these in an **`EnvironmentFile`** (e.g. `/etc/provisioning-agent/environment
 | `ERP_COMMAND_TIMEOUT_MS` | As today (e.g. `120000`) |
 | `ERP_CONTAINER_NAME` | Required for `docker` backend |
 
-Create the environment file on the server with the variables above (see project README **Deployment**); do not copy secrets from the repository’s placeholder `.env` templates.
+Create the environment file on the server with the variables above (see project README **Deployment**). Do not copy production secrets from git; the repo’s **`.env.example`** lists the HTTP service keys (placeholders only) for reference.
 
 ### 3.2 Working directory
 

@@ -1,5 +1,5 @@
-# Local / non-Dokploy development. The external `erp-execution` network must exist on the host
-# (created by the erp-execution-service stack).
+# Local development stack. Loads `env_file: .env` (copy from `.env.example`; `.env` is gitignored).
+# The external `erp-execution` network must exist on the host (created by the erp-execution-service stack).
 #
 #   docker compose up -d --build
 

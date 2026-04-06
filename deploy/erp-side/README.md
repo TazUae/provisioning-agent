@@ -12,6 +12,6 @@ Any prior `host_bench` material in this folder is operational legacy context and
 ## systemd
 
 - `systemd/provisioning-agent.service.example` — unit file template
-- `systemd/provisioning-agent.env.example` — intentionally empty placeholder (see repo README **Deployment**); do not put secrets in git. Create the real environment file on the server with secrets from your secret manager or Dokploy-equivalent.
+- `systemd/provisioning-agent.env.example` — minimal placeholder for systemd layout (see repo README **Deployment**). HTTP-related variable names align with the repo root **`.env.example`**; do not put secrets in git. Create the real environment file on the server with secrets from your secret manager or Dokploy-equivalent.
 
 Copy the unit to `/etc/systemd/system/`, create `/etc/provisioning-agent/environment` (or similar) on the host with real variables, then `daemon-reload` and `enable --now provisioning-agent`.

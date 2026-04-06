@@ -49,7 +49,7 @@ Typed error codes include: `AUTH_ERROR`, `VALIDATION_ERROR`, `SITE_NOT_FOUND`, `
 
 ## Environment variables
 
-Configure these in **Dokploy** (or your orchestrator’s environment UI), not in committed files. See **Deployment** below.
+The full key set is listed in **`.env.example`** (placeholders only). In production, set real values in **Dokploy** (see **Deployment**). Do not treat a committed `.env` file as authoritative for production.
 
 ### Required to run the server
 
@@ -75,7 +75,7 @@ Phase 1 HTTP routes use the **erp-execution-service** client (`ERP_REMOTE_*`). D
 
 ## Local development
 
-Set variables in your shell or editor (for example `export PROVISIONING_API_TOKEN=...`) or use a **local** untracked `.env` file (ignored by git). Do not commit secrets.
+Use **`.env.example` as the template only**: copy it to `.env` (gitignored), then edit values for your machine. You can also set variables in your shell (for example `export PROVISIONING_API_TOKEN=...`). Do not commit `.env` or real secrets.
 
 1. `npm install`
 2. `npm run dev`
@@ -85,32 +85,37 @@ Build and run compiled:
 - `npm run build`
 - `npm start`
 
+To verify your local `.env` keys match the template (names only, not values):
+
+```bash
+bash scripts/check-env-keys.sh
+```
+
 ## Deployment
 
-**Dokploy is the single source of truth for all environment variables and secrets.** Define every required value in the **Dokploy UI → Environment** tab for this service. Do not rely on `.env` files in the repository or in Docker Compose for secrets; tracked `.env*` templates in this repo are intentionally empty (comment-only) so nothing sensitive is ever merged from git.
+**Dokploy is the single source of truth for production runtime configuration.** Define every variable the app needs in **Dokploy → Environment** for this service. Production containers must not depend on a committed or stale `.env` file in the repo.
 
-- `docker-compose.yml` does **not** use `env_file:`; Compose injects variables from the process environment (Dokploy sets them at deploy time).
-- Required variables for the container have **no** default placeholder values in Compose—substitution fails if Dokploy does not provide them.
-- A git pull must never overwrite deployment secrets: `.env` is listed in `.gitignore` at the repo root and under `deploy/`, `src/`, and `provisioning_api/`.
+- **`.env.example`** in this repository is the **schema / template** (safe placeholders only). It documents required keys; it is not loaded in production by Dokploy.
+- **`.env`** is **local development only** (gitignored). Copy from `.env.example` when working on your laptop; it is not the production source of truth.
+- **`docker-compose.dokploy.yml`** maps each variable explicitly with `environment:` and `${VAR}` so values come from the Dokploy (host) environment at deploy time—not from `env_file:`.
+- **After you change environment variables in Dokploy**, **redeploy** the service so running containers receive the updates.
 
-For non-Dokploy installs (e.g. systemd on a VM), create a real environment file **on the server only** (mode `640`, root-owned or dedicated ops user) and reference it from the unit; do not copy secrets from this repository.
+For non-Dokploy installs (for example systemd on a VM), create an environment file **on the server only** (restricted permissions, ops-owned) and reference it from the unit; do not copy production secrets from this repository.
 
 ## Docker Compose
 
-The stack expects a **pre-created** Docker network named `control-plane` so the agent resolves alongside Control Plane:
+**Local (`docker-compose.yml`):** uses `env_file: .env` so a developer can keep secrets in a local `.env`. The external **`erp-execution`** network must already exist on the host (for example created by the erp-execution-service stack). See comments at the top of `docker-compose.yml`.
+
+**Production / Dokploy:** use `docker-compose.yml` together with `docker-compose.dokploy.yml` (see Dokploy project settings). Set variables in Dokploy; Compose will interpolate `${VAR}` in the override from the process environment (and from a project `.env` file if present on the build host **only** for substitution—not as the in-container secret source when using the Dokploy override).
+
+Example local build:
 
 ```bash
-docker network create control-plane
+docker compose -f docker-compose.yml -f docker-compose.dokploy.yml up -d --build
 ```
 
-Set variables in Dokploy (or export them in your shell before `docker compose` when testing locally), then:
-
-```bash
-docker compose up -d --build
-```
-
-- **Service name / DNS:** `provisioning-agent` (see `container_name` and `hostname` in `docker-compose.yml`).
-- **Internal port:** `8080`.
+- **Service name:** `provisioning-agent`.
+- **Internal port:** `8080` by default (`PORT`).
 - **Healthcheck:** `GET /health` (see `Dockerfile` and `docker-compose.yml`).
 
 ## Smoke tests

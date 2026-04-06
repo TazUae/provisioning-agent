@@ -5,8 +5,18 @@ services:
     build: .
     init: true
     restart: unless-stopped
-    env_file:
-      - .env
+    # Production values come from Dokploy (or the host env at deploy time), not from a repo .env file.
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${PORT}
+      PROVISIONING_API_TOKEN: ${PROVISIONING_API_TOKEN}
+      ERP_EXECUTION_BACKEND: ${ERP_EXECUTION_BACKEND}
+      ERP_REMOTE_BASE_URL: ${ERP_REMOTE_BASE_URL}
+      ERP_REMOTE_TOKEN: ${ERP_REMOTE_TOKEN}
+      ERP_REMOTE_TIMEOUT_MS: ${ERP_REMOTE_TIMEOUT_MS}
+      ERP_BASE_DOMAIN: ${ERP_BASE_DOMAIN}
+      ERP_API_USERNAME_PREFIX: ${ERP_API_USERNAME_PREFIX}
+      ERP_COMMAND_TIMEOUT_MS: ${ERP_COMMAND_TIMEOUT_MS}
     expose:
       - "${PORT}"
     networks:
