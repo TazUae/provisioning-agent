@@ -1,5 +1,7 @@
-# Dokploy injects env at deploy time; do not commit local .env files.
-**/.env
-**/.env.local
-.env
+# Local overrides and secret bundles (not committed). Template `.env` at repo root is committed.
 .env.local
+.env.production
+.env.secrets
+**/.env.local
+**/.env.production
+**/.env.secrets
