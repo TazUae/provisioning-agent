@@ -1,22 +1,18 @@
-# Provisioning agent (Phase 1): join the same user-defined network as control-plane.
+# Local / non-Dokploy development. The external `erp-execution` network must exist on the host
+# (created by the erp-execution-service stack).
 #
-# Create the shared network once (if control-plane does not already create it):
-#   docker network create control-plane
-#
-# Then:
 #   docker compose up -d --build
 
 services:
   provisioning-agent:
     build: .
-    container_name: provisioning-agent
-    hostname: provisioning-agent
     ports:
       - "${PORT:-8080}:${PORT:-8080}"
     env_file:
       - .env
     networks:
-      - control-plane
+      - default
+      - erp-execution
     healthcheck:
       test:
         [
@@ -31,6 +27,6 @@ services:
       start_period: 15s
 
 networks:
-  control-plane:
+  erp-execution:
     external: true
-    name: control-plane
+    name: axiserp-erpexecutionservice-gesc16_default

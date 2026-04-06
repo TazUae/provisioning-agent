@@ -1,0 +1,21 @@
+name: provisioning-agent
+
+services:
+  provisioning-agent:
+    build: .
+    init: true
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "${PORT}"
+    networks:
+      - dokploy-network
+      - erp-execution
+
+networks:
+  dokploy-network:
+    external: true
+  erp-execution:
+    external: true
+    name: axiserp-erpexecutionservice-gesc16_default
