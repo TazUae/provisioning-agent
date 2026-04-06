@@ -13,13 +13,8 @@ services:
     hostname: provisioning-agent
     ports:
       - "8080:8080"
-    environment:
-      NODE_ENV: production
-      PORT: "8080"
-      PROVISIONING_API_TOKEN: ${PROVISIONING_API_TOKEN:?}
-      ERP_ADMIN_PASSWORD: ${ERP_ADMIN_PASSWORD:?}
-      ERP_EXECUTION_BASE_URL: ${ERP_EXECUTION_BASE_URL:?}
-      ERP_EXECUTION_TOKEN: ${ERP_EXECUTION_TOKEN:?}
+    env_file:
+      - .env
     networks:
       - control-plane
     healthcheck:

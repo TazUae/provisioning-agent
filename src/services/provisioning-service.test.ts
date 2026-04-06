@@ -17,7 +17,8 @@ function stubBackend(overrides: Partial<ErpExecutionBackend>): ErpExecutionBacke
 
 test("passes backend success through service and executor", async () => {
   process.env.PROVISIONING_API_TOKEN ??= "test-provisioning-token";
-  process.env.ERP_ADMIN_PASSWORD ??= "test-admin-password";
+  process.env.ERP_REMOTE_BASE_URL ??= "http://127.0.0.1:18080";
+  process.env.ERP_REMOTE_TOKEN ??= "test-remote-token";
   process.env.ERP_BASE_DOMAIN ??= "erp.test";
   process.env.ERP_API_USERNAME_PREFIX ??= "cp";
 

@@ -56,21 +56,22 @@ Configure these in **Dokploy** (or your orchestrator’s environment UI), not in
 | Variable | Purpose |
 |----------|---------|
 | `PROVISIONING_API_TOKEN` | Bearer token Control Plane uses (minimum 16 characters). |
-| `ERP_ADMIN_PASSWORD` | Retained for compatibility with shared config and future phases (≥ 8 characters). |
-| `ERP_EXECUTION_BASE_URL` | Base URL of **erp-execution-service** (e.g. `http://erp-execution-service:8081`). |
-| `ERP_EXECUTION_TOKEN` | Bearer token provisioning-agent uses to call the executor. |
+| `ERP_REMOTE_BASE_URL` | Base URL of **erp-execution-service** (e.g. `http://erp-execution-service:8081`). |
+| `ERP_REMOTE_TOKEN` | Bearer token provisioning-agent uses to call the executor. |
 
-**Compatibility:** you may instead set `ERP_REMOTE_BASE_URL` and `ERP_REMOTE_TOKEN` (same values as before); `ERP_EXECUTION_*` is preferred.
-
-### Optional
+### Optional (defaults in `src/config/env.ts`)
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `PORT` | `8080` | Listen port. |
 | `NODE_ENV` | `development` | `development` \| `test` \| `production`. |
-| `ERP_EXECUTION_TIMEOUT_MS` | `15000` (or `ERP_REMOTE_TIMEOUT_MS`) | HTTP timeout for executor calls. |
+| `ERP_EXECUTION_BACKEND` | (see env) | `docker` or `remote`; when unset, non-production defaults to `docker`, production defaults to `remote`. |
+| `ERP_REMOTE_TIMEOUT_MS` | `15000` | HTTP timeout for executor calls. |
+| `ERP_BASE_DOMAIN` | `erp.zaidan-group.com` | Site derivation for provisioning. |
+| `ERP_API_USERNAME_PREFIX` | `cp` | Prefix for API usernames. |
+| `ERP_COMMAND_TIMEOUT_MS` | `120000` | Timeout for bench/docker subprocess operations. |
 
-Other variables (`ERP_BENCH_PATH`, `ERP_BASE_DOMAIN`, `ERP_EXECUTION_BACKEND`, etc.) apply to tooling and future phases; Phase 1 runtime paths use **only** the HTTP executor client above.
+Phase 1 HTTP routes use the **erp-execution-service** client (`ERP_REMOTE_*`). Docker bench bridge paths (`ERP_EXECUTION_BACKEND=docker`) use fixed defaults in `src/config/docker-bench-defaults.ts`, not environment variables.
 
 ## Local development
 

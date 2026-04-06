@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { AgentError } from "../../lib/errors.js";
 
 process.env.PROVISIONING_API_TOKEN = process.env.PROVISIONING_API_TOKEN ?? "test-provisioning-token";
-process.env.ERP_ADMIN_PASSWORD = process.env.ERP_ADMIN_PASSWORD ?? "test-admin-password";
+process.env.ERP_REMOTE_BASE_URL = process.env.ERP_REMOTE_BASE_URL ?? "http://127.0.0.1:18080";
+process.env.ERP_REMOTE_TOKEN = process.env.ERP_REMOTE_TOKEN ?? "test-remote-token";
 
 test("RemoteErpBackend fails clearly when remote config is missing", async () => {
   const { RemoteErpBackend } = await import("./remote-erp-backend.js");

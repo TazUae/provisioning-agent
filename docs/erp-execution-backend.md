@@ -13,8 +13,8 @@
 
 Backend selection is controlled by `ERP_EXECUTION_BACKEND` (see `src/config/env.ts`):
 
-- **`remote`** — **production** target: `RemoteErpBackend` calls the ERP-side **`erp-execution-service`** (`POST /v1/erp/lifecycle`, typed contract in `remote-contract.ts`). Prefer **`ERP_EXECUTION_BASE_URL`** and **`ERP_EXECUTION_TOKEN`** (or legacy `ERP_REMOTE_BASE_URL` / `ERP_REMOTE_TOKEN`) and optional **`ERP_EXECUTION_TIMEOUT_MS`** (or `ERP_REMOTE_TIMEOUT_MS`). The Phase 1 HTTP gateway (`ErpExecutionServiceClient`) uses the same lifecycle endpoint for `readSiteDbName`. In `NODE_ENV=production`, if `ERP_EXECUTION_BACKEND` is unset, the backend defaults to **`remote`**.
-- **`docker`** — dev/test bridge: `DockerExecBackend` — **temporary** compatibility only; needs Docker CLI on the host. In `development`/`test`, if unset, defaults to **`docker`**. In `NODE_ENV=production`, docker requires `ERP_DOCKER_ALLOW_IN_PRODUCTION=true`.
+- **`remote`** — **production** target: `RemoteErpBackend` calls the ERP-side **`erp-execution-service`** (`POST /v1/erp/lifecycle`, typed contract in `remote-contract.ts`). Set **`ERP_REMOTE_BASE_URL`**, **`ERP_REMOTE_TOKEN`**, and **`ERP_REMOTE_TIMEOUT_MS`**. The Phase 1 HTTP gateway (`ErpExecutionServiceClient`) uses the same lifecycle endpoint for `readSiteDbName`. In `NODE_ENV=production`, if `ERP_EXECUTION_BACKEND` is unset, the backend defaults to **`remote`**.
+- **`docker`** — dev/test bridge: `DockerExecBackend` — **temporary** compatibility only; needs Docker CLI on the host. In `development`/`test`, if unset, defaults to **`docker`**.
 
 ## Important constraints
 

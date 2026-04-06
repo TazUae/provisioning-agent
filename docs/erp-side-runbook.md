@@ -29,7 +29,7 @@ Background: **`docs/erp-side-runtime.md`**. Backend semantics: **`docs/erp-execu
 | **Bench tree** | Directory at **`ERP_BENCH_PATH`** exists on this host (e.g. `/home/frappe/frappe-bench`). |
 | **`bench` CLI** | On `PATH` for the service user, or set **`ERP_BENCH_EXECUTABLE`** to an absolute path. |
 | **Service user** | Dedicated account (e.g. `provisioning-agent`). Must be allowed to run `bench` with `cwd = ERP_BENCH_PATH` (often membership in `frappe` group or equivalent—**site-specific**). |
-| **Secrets** | **`PROVISIONING_API_TOKEN`** and **`ERP_ADMIN_PASSWORD`** match what Control Plane / ERP expect; store in root-owned mode `640` env file or secret manager. |
+| **Secrets** | **`PROVISIONING_API_TOKEN`** and executor credentials (**`ERP_REMOTE_TOKEN`**, etc.) match what Control Plane / ERP expect; store in root-owned mode `640` env file or secret manager. |
 | **Network** | Route/firewall from **Control Plane → this host:`PORT`**. If the agent was previously at `http://provisioning-agent:8080` on Docker DNS, after move you typically use **`http://<private-ip-or-dns>:8080`** reachable from CP. |
 
 Legacy host-bench validation fails fast if **`ERP_BENCH_PATH`** is missing or wrong—see `src/config/host-bench-runtime.ts`.
@@ -47,7 +47,8 @@ Set these in an **`EnvironmentFile`** (e.g. `/etc/provisioning-agent/environment
 | `NODE_ENV` | `production` |
 | `PORT` | e.g. `8080` (must match firewall and Control Plane URL) |
 | `PROVISIONING_API_TOKEN` | Strong shared secret with Control Plane |
-| `ERP_ADMIN_PASSWORD` | ERP admin password for scripted operations |
+| `ERP_REMOTE_BASE_URL` | Base URL of erp-execution-service on this stack |
+| `ERP_REMOTE_TOKEN` | Bearer token for erp-execution-service |
 | `ERP_EXECUTION_BACKEND` | **`docker`** for current supported strategic path (default); `remote` is scaffold-only and currently returns not-implemented |
 | `ERP_BENCH_PATH` | Absolute path to real bench on **this** host |
 | `ERP_BENCH_EXECUTABLE` | `bench` or absolute path |
@@ -67,7 +68,7 @@ Create the environment file on the server with the variables above (see project 
 
 - Run the service as **non-root** (`User=` / `Group=`).
 - Ensure that user can **read/execute** `ERP_BENCH_EXECUTABLE` and **access** `ERP_BENCH_PATH` as required by your Frappe version (sometimes group `frappe`, sometimes sudo—**avoid** granting the agent broad sudo; prefer filesystem ACLs/group).
-- Do not place world-readable files containing `PROVISIONING_API_TOKEN` or `ERP_ADMIN_PASSWORD`.
+- Do not place world-readable files containing `PROVISIONING_API_TOKEN` or `ERP_REMOTE_TOKEN`.
 
 ### 3.4 systemd unit (template)
 
@@ -86,7 +87,7 @@ Adjust **`ExecStart`** if `node` is not `/usr/bin/node` (e.g. nvm-managed paths 
 
 1. **Choose install root** (e.g. `/opt/provisioning-agent`) and owner (e.g. `provisioning-agent:provisioning-agent`).
 2. **Copy codebase** or release artifact; run `npm ci --omit=dev && npm run build` as that user (or build in CI and copy `dist/` + `package.json` + lockfile + `node_modules` from `npm ci --omit=dev`).
-3. **Create** `/etc/provisioning-agent/environment` from the example; set **`ERP_EXECUTION_BACKEND=docker`** (current strategic default), token, and passwords.
+3. **Create** `/etc/provisioning-agent/environment` from the example; set **`ERP_EXECUTION_BACKEND=docker`** (current strategic default), **`PROVISIONING_API_TOKEN`**, and **`ERP_REMOTE_*`** as needed.
 4. **Install** systemd unit; `daemon-reload`, `enable`, **do not start** yet if you need a maintenance window.
 5. **Firewall:** allow inbound TCP `PORT` from Control Plane subnet only.
 6. **Control Plane:** set **`PROVISIONING_API_URL`** to the new base URL (e.g. `http://10.x.x.x:8080`). Token must match **`PROVISIONING_API_TOKEN`**.

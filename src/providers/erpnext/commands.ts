@@ -3,7 +3,10 @@
  * - `buildBenchOperationArgs`: argv after `bench` (shared by Docker and host backends).
  * - `buildDockerExecBenchArgv`: full `docker exec … bench …` argv for `DockerExecBackend` only.
  */
-import { env } from "../../config/env.js";
+import {
+  DOCKER_BENCH_DEFAULTS,
+  DOCKER_BENCH_NEW_SITE_ADMIN_PASSWORD,
+} from "../../config/docker-bench-defaults.js";
 import { validateDomain, validateSite, validateUsername } from "./validation.js";
 
 export type AllowedProvisioningAction =
@@ -21,7 +24,13 @@ type BuildActionInput = {
 
 /** `docker exec -w <bench> <container> bench` — not used by host bench backend. */
 function buildDockerExecBenchPrefix(): string[] {
-  return ["exec", "-w", env.ERP_BENCH_PATH, env.ERP_CONTAINER_NAME, "bench"];
+  return [
+    "exec",
+    "-w",
+    DOCKER_BENCH_DEFAULTS.BENCH_PATH,
+    DOCKER_BENCH_DEFAULTS.CONTAINER_NAME,
+    "bench",
+  ];
 }
 
 /**
@@ -37,7 +46,7 @@ export function buildBenchOperationArgs(action: AllowedProvisioningAction, input
         "new-site",
         site,
         "--admin-password",
-        env.ERP_ADMIN_PASSWORD,
+        DOCKER_BENCH_NEW_SITE_ADMIN_PASSWORD,
         "--db-type",
         "mariadb",
       ];

@@ -1,4 +1,5 @@
 import { execCommand } from "../../lib/exec.js";
+import { DOCKER_BENCH_DEFAULTS } from "../../config/docker-bench-defaults.js";
 import { env } from "../../config/env.js";
 import { buildDockerExecBenchArgv } from "./commands.js";
 import { mapBackendFailure } from "./errors.js";
@@ -18,9 +19,8 @@ import type {
 
 /**
  * Dev/test bridge when `ERP_EXECUTION_BACKEND=docker`: allowlisted bench operations via `docker exec`
- * into `ERP_CONTAINER_NAME`. Requires Docker CLI and socket access on the host — not available in the
- * default slim container image. Production uses `remote`; docker in production requires
- * `ERP_DOCKER_ALLOW_IN_PRODUCTION=true`.
+ * into the ERP container (`DOCKER_BENCH_DEFAULTS.CONTAINER_NAME`). Requires Docker CLI and socket access
+ * on the host — not available in the default slim container image. Production uses `remote`.
  * Do not add generic exec passthrough here.
  */
 export class DockerExecBackend implements ErpExecutionBackend {
@@ -34,7 +34,14 @@ export class DockerExecBackend implements ErpExecutionBackend {
     try {
       const result = await execCommand(
         "docker",
-        ["exec", "-w", env.ERP_BENCH_PATH, env.ERP_CONTAINER_NAME, "cat", rel],
+        [
+          "exec",
+          "-w",
+          DOCKER_BENCH_DEFAULTS.BENCH_PATH,
+          DOCKER_BENCH_DEFAULTS.CONTAINER_NAME,
+          "cat",
+          rel,
+        ],
         { timeoutMs: env.ERP_COMMAND_TIMEOUT_MS }
       );
       const parsed = parseSiteConfigDbNameJson(result.stdout);

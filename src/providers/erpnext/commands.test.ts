@@ -2,8 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 async function loadBuildBenchArgs() {
-  process.env.PROVISIONING_API_TOKEN ??= "test-provisioning-token";
-  process.env.ERP_ADMIN_PASSWORD ??= "test-admin-password";
   const module = await import("./commands.js");
   return module.buildBenchArgs;
 }
@@ -38,8 +36,6 @@ test("buildBenchArgs for createApiUser requires username", async () => {
 });
 
 test("buildBenchOperationArgs matches docker argv after bench for all actions", async () => {
-  process.env.PROVISIONING_API_TOKEN ??= "test-provisioning-token";
-  process.env.ERP_ADMIN_PASSWORD ??= "test-admin-password";
   const { buildBenchOperationArgs, buildDockerExecBenchArgv } = await import("./commands.js");
 
   const cases: Array<{
@@ -63,8 +59,6 @@ test("buildBenchOperationArgs matches docker argv after bench for all actions", 
 });
 
 test("docker argv remains strict argv-based without shell wrappers", async () => {
-  process.env.PROVISIONING_API_TOKEN ??= "test-provisioning-token";
-  process.env.ERP_ADMIN_PASSWORD ??= "test-admin-password";
   const { buildDockerExecBenchArgv } = await import("./commands.js");
   const args = buildDockerExecBenchArgv("createSite", { site: "acme" });
   assert.equal(args.includes("bash"), false);

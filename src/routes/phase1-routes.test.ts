@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import type { ErpExecutionReadDbPort } from "../clients/erp-execution-read-db-port.js";
 
 process.env.PROVISIONING_API_TOKEN ??= "test-provisioning-token-phase1-routes";
-process.env.ERP_ADMIN_PASSWORD ??= "test-admin-password";
+process.env.ERP_REMOTE_BASE_URL ??= "http://127.0.0.1:18080";
+process.env.ERP_REMOTE_TOKEN ??= "test-remote-token-phase1-routes";
 
 test("GET /health returns stable success contract", async () => {
   const mock: ErpExecutionReadDbPort = {

@@ -1,4 +1,5 @@
 import { execCommand } from "../../lib/exec.js";
+import { DOCKER_BENCH_DEFAULTS } from "../../config/docker-bench-defaults.js";
 import { env } from "../../config/env.js";
 import { buildBenchOperationArgs } from "./commands.js";
 import { AgentError } from "../../lib/errors.js";
@@ -31,7 +32,7 @@ export class HostBenchExecBackend implements ErpExecutionBackend {
 
   async readSiteDbName(input: ReadSiteDbNameInput): Promise<ErpBackendExecSuccess> {
     const started = Date.now();
-    const read = await readSiteConfigDbName(env.ERP_BENCH_PATH, input.site);
+    const read = await readSiteConfigDbName(DOCKER_BENCH_DEFAULTS.BENCH_PATH, input.site);
     if (!read.ok) {
       throw new AgentError("ERP_PARTIAL_SUCCESS", "Could not read site_config db_name", {
         details: read.details ?? read.code,
@@ -69,8 +70,8 @@ export class HostBenchExecBackend implements ErpExecutionBackend {
 
   async healthCheck(_input: HealthCheckInput): Promise<ErpBackendExecSuccess> {
     const startedAt = Date.now();
-    await execCommand(env.ERP_BENCH_EXECUTABLE, ["--version"], {
-      cwd: env.ERP_BENCH_PATH,
+    await execCommand(DOCKER_BENCH_DEFAULTS.BENCH_EXECUTABLE, ["--version"], {
+      cwd: DOCKER_BENCH_DEFAULTS.BENCH_PATH,
       timeoutMs: env.ERP_COMMAND_TIMEOUT_MS,
     });
     return { durationMs: Date.now() - startedAt };
@@ -81,8 +82,8 @@ export class HostBenchExecBackend implements ErpExecutionBackend {
     buildInput: Parameters<typeof buildBenchOperationArgs>[1]
   ): Promise<ErpBackendExecSuccess> {
     const args = buildBenchOperationArgs(action, buildInput);
-    const result = await execCommand(env.ERP_BENCH_EXECUTABLE, args, {
-      cwd: env.ERP_BENCH_PATH,
+    const result = await execCommand(DOCKER_BENCH_DEFAULTS.BENCH_EXECUTABLE, args, {
+      cwd: DOCKER_BENCH_DEFAULTS.BENCH_PATH,
       timeoutMs: env.ERP_COMMAND_TIMEOUT_MS,
     });
     return { durationMs: result.durationMs };

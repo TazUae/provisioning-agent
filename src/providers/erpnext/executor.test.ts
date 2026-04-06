@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 
 async function loadDetectIdempotentOutcome() {
   process.env.PROVISIONING_API_TOKEN ??= "test-provisioning-token";
-  process.env.ERP_ADMIN_PASSWORD ??= "test-admin-password";
+  process.env.ERP_REMOTE_BASE_URL ??= "http://127.0.0.1:18080";
+  process.env.ERP_REMOTE_TOKEN ??= "test-remote-token";
   const module = await import("./executor.js");
   return module.detectIdempotentOutcome;
 }
