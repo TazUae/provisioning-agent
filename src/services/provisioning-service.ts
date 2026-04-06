@@ -5,6 +5,7 @@ import { ErpnextExecutor } from "../providers/erpnext/executor.js";
 import { validateSite } from "../providers/erpnext/validation.js";
 import type { ErpExecutionBackend } from "../providers/erpnext/erp-execution-backend.js";
 import { logger } from "../lib/logger.js";
+import { extractDbNameFromMetadata } from "../lib/erp-metadata-db-name.js";
 
 export class ProvisioningService {
   private readonly executor: ErpnextExecutor;
@@ -35,9 +36,9 @@ export class ProvisioningService {
       "readSiteDbName started"
     );
     const result = await this.backend.readSiteDbName({ site: safeSite, requestId });
-    const dbName = typeof result.metadata?.dbName === "string" ? result.metadata.dbName : undefined;
+    const dbName = extractDbNameFromMetadata(result.metadata);
     if (!dbName) {
-      throw new AgentError("ERP_PARTIAL_SUCCESS", "Remote ERP did not return dbName metadata", {
+      throw new AgentError("ERP_PARTIAL_SUCCESS", "Remote ERP did not return db_name metadata", {
         retryable: false,
         statusCode: 502,
       });

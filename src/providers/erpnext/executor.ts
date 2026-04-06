@@ -3,6 +3,7 @@ import { AgentError } from "../../lib/errors.js";
 import { ProvisioningOperationResult } from "../../contracts/provisioning.js";
 import { AllowedProvisioningAction } from "./commands.js";
 import { env } from "../../config/env.js";
+import { extractDbNameFromMetadata } from "../../lib/erp-metadata-db-name.js";
 import { validateDomain, validateSite, validateUsername } from "./validation.js";
 import type { ErpExecutionBackend } from "./erp-execution-backend.js";
 
@@ -22,8 +23,7 @@ type IdempotentOutcome = {
 };
 
 function pickDbName(metadata?: Record<string, string | number | boolean>): string | undefined {
-  const v = metadata?.dbName;
-  return typeof v === "string" && v.trim() !== "" ? v.trim() : undefined;
+  return extractDbNameFromMetadata(metadata);
 }
 
 export function detectIdempotentOutcome(

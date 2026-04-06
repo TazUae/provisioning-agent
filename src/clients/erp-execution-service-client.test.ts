@@ -8,7 +8,24 @@ const baseConfig = {
   timeoutMs: 5000,
 };
 
-test("readDbName returns db name on success envelope", async () => {
+test("readDbName returns db name on success envelope with metadata.db_name", async () => {
+  const fetchMock: typeof fetch = async () =>
+    new Response(
+      JSON.stringify({
+        ok: true,
+        data: {
+          durationMs: 10,
+          metadata: { db_name: "_fe883896178c6f75" },
+        },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    );
+  const client = new ErpExecutionServiceClient({ ...baseConfig, fetchImpl: fetchMock });
+  const result = await client.readDbName("acme.example.com");
+  assert.deepEqual(result, { ok: true, dbName: "_fe883896178c6f75" });
+});
+
+test("readDbName returns db name on success envelope with metadata.dbName (legacy)", async () => {
   const fetchMock: typeof fetch = async () =>
     new Response(
       JSON.stringify({
@@ -59,7 +76,7 @@ test("readDbName maps SITE_NOT_FOUND from failure envelope", async () => {
   }
 });
 
-test("readDbName maps malformed success payload to INVALID_UPSTREAM_RESPONSE", async () => {
+test("readDbName maps malformed success payload to INVALID_UPSTREAM_RESPONSE when metadata omits db keys", async () => {
   const fetchMock: typeof fetch = async () =>
     new Response(
       JSON.stringify({
@@ -76,6 +93,7 @@ test("readDbName maps malformed success payload to INVALID_UPSTREAM_RESPONSE", a
   assert.equal(result.ok, false);
   if (!result.ok) {
     assert.equal(result.code, "INVALID_UPSTREAM_RESPONSE");
+    assert.match(result.message, /db_name metadata/i);
   }
 });
 
@@ -122,7 +140,7 @@ test("provisionSite runs lifecycle sequence and aggregates steps", async () => {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     const durationMs = calls === 1 ? 100 : 10;
     const metadata =
-      body.action === "createSite" ? { dbName: "_acme_db" } : body.action === "readSiteDbName" ? {} : {};
+      body.action === "createSite" ? { db_name: "_acme_db" } : body.action === "readSiteDbName" ? {} : {};
     return new Response(
       JSON.stringify({
         ok: true,
@@ -146,5 +164,31 @@ test("provisionSite runs lifecycle sequence and aggregates steps", async () => {
     assert.equal(result.data.steps.length, 5);
     assert.equal(result.data.steps[0]?.action, "createSite");
     assert.equal(result.data.steps[4]?.action, "createApiUser");
+  }
+});
+
+test("provisionSite includes db_name from createSite when metadata uses legacy dbName", async () => {
+  const fetchMock: typeof fetch = async (_input, init) => {
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    const metadata =
+      body.action === "createSite" ? { dbName: "_legacy_db" } : body.action === "readSiteDbName" ? {} : {};
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        data: { durationMs: 10, metadata },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    );
+  };
+  const client = new ErpExecutionServiceClient({
+    ...baseConfig,
+    fetchImpl: fetchMock,
+    erpBaseDomain: "example.test",
+    apiUsernamePrefix: "cp",
+  });
+  const result = await client.provisionSite("legacy");
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.data.db_name, "_legacy_db");
   }
 });

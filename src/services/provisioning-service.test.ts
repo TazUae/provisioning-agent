@@ -15,6 +15,29 @@ function stubBackend(overrides: Partial<ErpExecutionBackend>): ErpExecutionBacke
   return { ...base, ...overrides };
 }
 
+test("readSiteDbName extracts db name from metadata.db_name", async () => {
+  process.env.PROVISIONING_API_TOKEN ??= "test-provisioning-token";
+  process.env.ERP_REMOTE_BASE_URL ??= "http://127.0.0.1:18080";
+  process.env.ERP_REMOTE_TOKEN ??= "test-remote-token";
+  process.env.ERP_BASE_DOMAIN ??= "erp.test";
+  process.env.ERP_API_USERNAME_PREFIX ??= "cp";
+
+  const { ProvisioningService } = await import("./provisioning-service.js");
+
+  const service = new ProvisioningService(
+    stubBackend({
+      readSiteDbName: async () => ({
+        durationMs: 3,
+        metadata: { db_name: "_from_metadata_snake" },
+      }),
+    })
+  );
+
+  const result = await service.readSiteDbName("tenant");
+  assert.equal(result.action, "readSiteDbName");
+  assert.equal(result.dbName, "_from_metadata_snake");
+});
+
 test("passes backend success through service and executor", async () => {
   process.env.PROVISIONING_API_TOKEN ??= "test-provisioning-token";
   process.env.ERP_REMOTE_BASE_URL ??= "http://127.0.0.1:18080";

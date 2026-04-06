@@ -9,6 +9,7 @@ import {
   type RemoteExecutionEnvelope,
 } from "../providers/erpnext/remote-contract.js";
 import { validateDomain, validateSite, validateUsername } from "../providers/erpnext/validation.js";
+import { extractDbNameFromMetadata } from "../lib/erp-metadata-db-name.js";
 
 export type ErpExecutionServiceClientConfig = {
   baseUrl: string;
@@ -110,14 +111,7 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
       return result;
     }
 
-    const meta = result.value.metadata;
-    const rawDb = meta?.dbName;
-    const dbName =
-      typeof rawDb === "string"
-        ? rawDb.trim()
-        : typeof rawDb === "number" || typeof rawDb === "boolean"
-          ? String(rawDb).trim()
-          : "";
+    const dbName = extractDbNameFromMetadata(result.value.metadata);
 
     if (!dbName) {
       return {
@@ -166,13 +160,7 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
       }
       steps.push({ action, durationMs: r.value.durationMs });
       if (action === "createSite") {
-        const raw = r.value.metadata?.dbName;
-        const extracted =
-          typeof raw === "string"
-            ? raw.trim()
-            : typeof raw === "number" || typeof raw === "boolean"
-              ? String(raw).trim()
-              : "";
+        const extracted = extractDbNameFromMetadata(r.value.metadata);
         if (extracted) {
           dbName = extracted;
         }
