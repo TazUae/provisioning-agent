@@ -49,6 +49,8 @@ Typed error codes include: `AUTH_ERROR`, `VALIDATION_ERROR`, `SITE_NOT_FOUND`, `
 
 ## Environment variables
 
+Configure these in **Dokploy** (or your orchestrator’s environment UI), not in committed files. See **Deployment** below.
+
 ### Required to run the server
 
 | Variable | Purpose |
@@ -68,18 +70,29 @@ Typed error codes include: `AUTH_ERROR`, `VALIDATION_ERROR`, `SITE_NOT_FOUND`, `
 | `NODE_ENV` | `development` | `development` \| `test` \| `production`. |
 | `ERP_EXECUTION_TIMEOUT_MS` | `15000` (or `ERP_REMOTE_TIMEOUT_MS`) | HTTP timeout for executor calls. |
 
-Other variables (`ERP_BENCH_PATH`, `ERP_BASE_DOMAIN`, `ERP_EXECUTION_BACKEND`, etc.) remain in `.env.example` for tooling and future phases; Phase 1 runtime paths use **only** the HTTP executor client above.
+Other variables (`ERP_BENCH_PATH`, `ERP_BASE_DOMAIN`, `ERP_EXECUTION_BACKEND`, etc.) apply to tooling and future phases; Phase 1 runtime paths use **only** the HTTP executor client above.
 
 ## Local development
 
-1. Copy `.env.example` to `.env` and set `PROVISIONING_API_TOKEN`, `ERP_ADMIN_PASSWORD`, `ERP_EXECUTION_BASE_URL`, and `ERP_EXECUTION_TOKEN` (point `ERP_EXECUTION_BASE_URL` at a running erp-execution-service).
-2. `npm install`
-3. `npm run dev`
+Set variables in your shell or editor (for example `export PROVISIONING_API_TOKEN=...`) or use a **local** untracked `.env` file (ignored by git). Do not commit secrets.
+
+1. `npm install`
+2. `npm run dev`
 
 Build and run compiled:
 
 - `npm run build`
 - `npm start`
+
+## Deployment
+
+**Dokploy is the single source of truth for all environment variables and secrets.** Define every required value in the **Dokploy UI → Environment** tab for this service. Do not rely on `.env` files in the repository or in Docker Compose for secrets; tracked `.env*` templates in this repo are intentionally empty (comment-only) so nothing sensitive is ever merged from git.
+
+- `docker-compose.yml` does **not** use `env_file:`; Compose injects variables from the process environment (Dokploy sets them at deploy time).
+- Required variables for the container have **no** default placeholder values in Compose—substitution fails if Dokploy does not provide them.
+- A git pull must never overwrite deployment secrets: `.env` is listed in `.gitignore` at the repo root and under `deploy/`, `src/`, and `provisioning_api/`.
+
+For non-Dokploy installs (e.g. systemd on a VM), create a real environment file **on the server only** (mode `640`, root-owned or dedicated ops user) and reference it from the unit; do not copy secrets from this repository.
 
 ## Docker Compose
 
@@ -87,23 +100,17 @@ The stack expects a **pre-created** Docker network named `control-plane` so the 
 
 ```bash
 docker network create control-plane
-export PROVISIONING_API_TOKEN=...
-export ERP_ADMIN_PASSWORD=...
-export ERP_EXECUTION_BASE_URL=http://erp-execution-service:8081
-export ERP_EXECUTION_TOKEN=...
+```
+
+Set variables in Dokploy (or export them in your shell before `docker compose` when testing locally), then:
+
+```bash
 docker compose up -d --build
 ```
 
 - **Service name / DNS:** `provisioning-agent` (see `container_name` and `hostname` in `docker-compose.yml`).
 - **Internal port:** `8080`.
 - **Healthcheck:** `GET /health` (see `Dockerfile` and `docker-compose.yml`).
-
-## Deployment notes
-
-- Run behind the private network only; do not expose to the public internet without additional controls.
-- Control Plane should call `http://provisioning-agent:8080` (or your internal equivalent) on the shared `control-plane` network.
-- Set strong, unique values for `PROVISIONING_API_TOKEN` (Control Plane) and `ERP_EXECUTION_TOKEN` (executor); rotate independently.
-- Ensure `ERP_EXECUTION_BASE_URL` is reachable from the provisioning-agent container (same Docker network or routed internal URL).
 
 ## Smoke tests
 

@@ -56,7 +56,7 @@ Set these in an **`EnvironmentFile`** (e.g. `/etc/provisioning-agent/environment
 | `ERP_COMMAND_TIMEOUT_MS` | As today (e.g. `120000`) |
 | `ERP_CONTAINER_NAME` | Required for `docker` backend |
 
-Copy from **`deploy/erp-side/systemd/provisioning-agent.env.example`** and edit secrets/paths.
+Create the environment file on the server with the variables above (see project README **Deployment**); do not copy secrets from the repository’s placeholder `.env` templates.
 
 ### 3.2 Working directory
 
