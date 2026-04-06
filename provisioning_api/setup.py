@@ -1,10 +1,5 @@
-from setuptools import find_packages, setup
+"""Editable install for bench: ``pip install -e apps/provisioning_api`` (see pyproject.toml)."""
 
-setup(
-    name="provisioning_api",
-    version="0.1.0",
-    description="Internal provisioning API for ERP-side operations",
-    packages=find_packages(),
-    zip_safe=False,
-    include_package_data=True,
-)
+from setuptools import setup
+
+setup()

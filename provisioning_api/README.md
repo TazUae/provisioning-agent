@@ -1,5 +1,7 @@
 # provisioning_api (Frappe app)
 
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for bench layout, `modules.txt`, `pip install -e`, and migrate troubleshooting.
+
 Internal ERP-side Frappe app that exposes a **narrow, allowlisted** HTTP API for provisioning automation. Callers use Frappe’s standard endpoint:
 
 `POST /api/method/<dotted.path>`

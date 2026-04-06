@@ -1,0 +1,5 @@
+recursive-include provisioning_api *.py
+include provisioning_api/modules.txt
+include provisioning_api/hooks.py
+include README.md
+include license.txt
