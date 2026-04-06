@@ -1,126 +1,128 @@
 # provisioning-agent
 
-Internal-only provisioning service for ERP host actions.
+Stable provisioning interface between **Control Plane** and **erp-execution-service** (ERP/Frappe work stays in the executor).
 
-## Purpose
+## Architecture (Phase 1)
 
-- Exposes a narrow HTTP API for approved provisioning actions.
-- Uses token auth (`Authorization: Bearer <PROVISIONING_API_TOKEN>`).
-- Executes only allowlisted ERP operations through the typed **`ErpExecutionBackend`** interface (`src/providers/erpnext/erp-execution-backend.ts`).
-- **Production** uses **`ERP_EXECUTION_BACKEND=remote`**: `RemoteErpBackend` calls the ERP-side lifecycle HTTP API (`POST /v1/erp/lifecycle`, contract in `remote-contract.ts`) and fails fast if required remote config is missing.
-- **`docker`** is an explicit **dev/test** bridge (`DockerExecBackend`): strict `docker exec` argv only. It requires Docker CLI and a socket on the **host** — the default container image does **not** include Docker; do not assume this mode works inside the slim image.
-- No arbitrary shell execution, no `bash -c`, no generic bench passthrough, no generic Docker control.
+```
+Control Plane → provisioning-agent → erp-execution-service → ERP / Frappe
+```
 
-## Execution backends
+This service is an **orchestration and normalization** layer only: it authenticates callers, validates inputs, calls the executor over HTTP, and maps responses to a stable JSON contract. It does not run bench, Docker, or Frappe directly in production.
 
-| Mode | When to use | Requirements |
-|------|----------------|--------------|
-| **`remote`** | **Production** (default in production when `ERP_EXECUTION_BACKEND` is unset) | `ERP_REMOTE_BASE_URL`, `ERP_REMOTE_TOKEN`; optional `ERP_REMOTE_TIMEOUT_MS` |
-| **`docker`** | Local/dev or hosts with Docker CLI + socket | `ERP_CONTAINER_NAME`, bench-related vars; in **`NODE_ENV=production`** also `ERP_DOCKER_ALLOW_IN_PRODUCTION=true` |
+## Phase 1 endpoints
 
-**Defaults:**
+| Method | Path | Auth |
+|--------|------|------|
+| `GET` | `/health` | No |
+| `POST` | `/sites/read-db-name` | `Authorization: Bearer <PROVISIONING_API_TOKEN>` |
 
-- **`NODE_ENV=production`**: if `ERP_EXECUTION_BACKEND` is unset, the backend is **`remote`** (not docker).
-- **`development` / `test`**: if unset, the backend is **`docker`** for local workflows.
+### Response shape (Control Plane contract)
 
-Set `ERP_EXECUTION_BACKEND` explicitly in every deployment to avoid ambiguity.
+**Success**
 
-## Endpoints
+```json
+{ "success": true, "data": { ... } }
+```
 
-- `GET /health` — liveness: process up; does not call the ERP backend.
-- `GET /health/ready` — readiness: if `ERP_HEALTH_CHECK_DOWNSTREAM=true`, probes the configured ERP execution backend (`healthCheck`); otherwise returns ready without a downstream call (see below).
-- `POST /sites/create`
-- `POST /sites/install-erp`
-- `POST /sites/enable-scheduler`
-- `POST /sites/add-domain`
-- `POST /sites/create-api-user`
+**Failure**
 
-## Setup
+```json
+{ "success": false, "error": { "code": "<typed_code>", "message": "<safe_message>" } }
+```
 
-1. Copy `.env.example` to `.env` and fill values.
-2. Install dependencies:
-   - `npm install`
-3. Run in development:
-   - `npm run dev`
-4. Build:
-   - `npm run build`
-5. Start built service:
-   - `npm start`
+`POST /sites/read-db-name` success payload:
 
-## Deployment (Dokploy / production)
+```json
+{ "success": true, "data": { "db_name": "<string>" } }
+```
 
-### Production checklist
+Typed error codes include: `AUTH_ERROR`, `VALIDATION_ERROR`, `SITE_NOT_FOUND`, `UPSTREAM_TIMEOUT`, `UPSTREAM_HTTP_ERROR`, `INVALID_UPSTREAM_RESPONSE`, `INTERNAL_ERROR`.
 
-- `NODE_ENV=production`
-- **`ERP_EXECUTION_BACKEND=remote`** (recommended explicit; if omitted, production still defaults to `remote`)
-- **`ERP_REMOTE_BASE_URL`** — base URL of the ERP-side executor (HTTPS or internal HTTP)
-- **`ERP_REMOTE_TOKEN`** — bearer token shared with the executor
-- **`PROVISIONING_API_TOKEN`**, **`ERP_ADMIN_PASSWORD`**, and other app secrets as below
+### Request body (`POST /sites/read-db-name`)
 
-### Container
+```json
+{ "site_name": "<site-slug-or-fqdn>" }
+```
 
-- Build context: `provisioning-agent`
-- Dockerfile: `provisioning-agent/Dockerfile`
-- Internal port: `8080`
-- **No Docker CLI** in the image; the service is a stateless orchestration/gateway. Production ERP work runs **remotely** via `remote` mode.
-- **erp-utils** is copied and built as a local package (see Dockerfile).
-- Liveness: `GET /health`
-- Optional readiness with downstream probe: `GET /health/ready` with `ERP_HEALTH_CHECK_DOWNSTREAM=true`
+`site_name` must be a valid Frappe-style site slug (`^[a-z0-9-]+$`, length 3–50) or a lowercase FQDN.
 
-### Internal-Only Posture
+## Environment variables
 
-- Do not publish this service on a public domain by default.
-- Attach the container only to internal/private networks in Dokploy.
-- Allow inbound traffic only from trusted internal services (for example, the Control Plane API).
-- Recommended Dokploy setup: no public ingress/domain, internal service name `provisioning-agent`, and shared private network with Control Plane.
+### Required to run the server
 
-### Required environment variables (production)
+| Variable | Purpose |
+|----------|---------|
+| `PROVISIONING_API_TOKEN` | Bearer token Control Plane uses (minimum 16 characters). |
+| `ERP_ADMIN_PASSWORD` | Retained for compatibility with shared config and future phases (≥ 8 characters). |
+| `ERP_EXECUTION_BASE_URL` | Base URL of **erp-execution-service** (e.g. `http://erp-execution-service:8081`). |
+| `ERP_EXECUTION_TOKEN` | Bearer token provisioning-agent uses to call the executor. |
 
-Always:
+**Compatibility:** you may instead set `ERP_REMOTE_BASE_URL` and `ERP_REMOTE_TOKEN` (same values as before); `ERP_EXECUTION_*` is preferred.
 
-- `NODE_ENV=production`
-- `PORT=8080` (or your platform default)
-- `PROVISIONING_API_TOKEN=<long-random-internal-token>`
-- `ERP_ADMIN_PASSWORD=<erp-admin-password>`
-- `ERP_BENCH_PATH=/home/frappe/frappe-bench` (contract/metadata; remote mode does not run bench locally)
-- `ERP_BASE_DOMAIN=<internal-base-domain>`
-- `ERP_API_USERNAME_PREFIX=cp`
-- `ERP_COMMAND_TIMEOUT_MS=120000`
+### Optional
 
-**Remote backend (production):**
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | `8080` | Listen port. |
+| `NODE_ENV` | `development` | `development` \| `test` \| `production`. |
+| `ERP_EXECUTION_TIMEOUT_MS` | `15000` (or `ERP_REMOTE_TIMEOUT_MS`) | HTTP timeout for executor calls. |
 
-- `ERP_EXECUTION_BACKEND=remote` (recommended explicit)
-- `ERP_REMOTE_BASE_URL=<executor-base-url>`
-- `ERP_REMOTE_TOKEN=<shared-bearer-token>`
-- `ERP_REMOTE_TIMEOUT_MS` — optional (default `15000`)
+Other variables (`ERP_BENCH_PATH`, `ERP_BASE_DOMAIN`, `ERP_EXECUTION_BACKEND`, etc.) remain in `.env.example` for tooling and future phases; Phase 1 runtime paths use **only** the HTTP executor client above.
 
-**Docker backend (non-production or exceptional production host):**
+## Local development
 
-- `ERP_EXECUTION_BACKEND=docker`
-- `ERP_CONTAINER_NAME=<erp-backend-container>`
-- If `NODE_ENV=production`: **`ERP_DOCKER_ALLOW_IN_PRODUCTION=true`** (acknowledges docker mode on a host that actually has Docker CLI/socket access)
+1. Copy `.env.example` to `.env` and set `PROVISIONING_API_TOKEN`, `ERP_ADMIN_PASSWORD`, `ERP_EXECUTION_BASE_URL`, and `ERP_EXECUTION_TOKEN` (point `ERP_EXECUTION_BASE_URL` at a running erp-execution-service).
+2. `npm install`
+3. `npm run dev`
 
-### Networking assumptions
+Build and run compiled:
 
-- `provisioning-agent` and `control-plane-api` are on the same internal Docker network.
-- The service name `provisioning-agent` is resolvable via internal DNS on that network.
-- Control Plane calls the agent through an internal URL, not a public endpoint.
-- In **remote** mode, `ERP_REMOTE_BASE_URL` must reach the ERP-side executor on the private network.
+- `npm run build`
+- `npm start`
 
-### Example Control Plane URL
+## Docker Compose
 
-- `http://provisioning-agent:8080`
-- Control Plane should set `PROVISIONING_API_URL=http://provisioning-agent:8080` in deployment configuration.
+The stack expects a **pre-created** Docker network named `control-plane` so the agent resolves alongside Control Plane:
 
-### Health expectations
+```bash
+docker network create control-plane
+export PROVISIONING_API_TOKEN=...
+export ERP_ADMIN_PASSWORD=...
+export ERP_EXECUTION_BASE_URL=http://erp-execution-service:8081
+export ERP_EXECUTION_TOKEN=...
+docker compose up -d --build
+```
 
-- **Liveness (orchestrator up):** `GET /health` — HTTP `200`, `ok: true`, `data.status: "ok"`.
-- **Readiness (optional downstream):** configure `ERP_HEALTH_CHECK_DOWNSTREAM=true` and use `GET /health/ready`. On success, HTTP `200` with `data.downstream.probed: true` and timing metadata. On downstream failure, HTTP `503` with the standard error envelope. If `ERP_HEALTH_CHECK_DOWNSTREAM` is unset/false, `GET /health/ready` returns `200` with `data.downstream.probed: false` (no network call to the ERP backend).
+- **Service name / DNS:** `provisioning-agent` (see `container_name` and `hostname` in `docker-compose.yml`).
+- **Internal port:** `8080`.
+- **Healthcheck:** `GET /health` (see `Dockerfile` and `docker-compose.yml`).
 
-## Notes
+## Deployment notes
 
-- This service is designed for internal network deployment only.
-- No generic command execution endpoint is provided; **no arbitrary command execution** — only typed backend methods (`createSite`, `installErp`, etc.), never raw bench or shell passthrough.
-- Response envelopes are contract-aligned for Control Plane integration.
-- ERP execution is allowlisted per action; the docker backend uses `spawn` with argv only (no shell).
-- Further detail: `docs/erp-execution-backend.md`.
+- Run behind the private network only; do not expose to the public internet without additional controls.
+- Control Plane should call `http://provisioning-agent:8080` (or your internal equivalent) on the shared `control-plane` network.
+- Set strong, unique values for `PROVISIONING_API_TOKEN` (Control Plane) and `ERP_EXECUTION_TOKEN` (executor); rotate independently.
+- Ensure `ERP_EXECUTION_BASE_URL` is reachable from the provisioning-agent container (same Docker network or routed internal URL).
+
+## Smoke tests
+
+**Health (no auth):**
+
+```bash
+curl -sS "http://127.0.0.1:8080/health"
+```
+
+**Read DB name (replace token and site):**
+
+```bash
+curl -sS -X POST "http://127.0.0.1:8080/sites/read-db-name" \
+  -H "Authorization: Bearer ${PROVISIONING_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{\"site_name\":\"your-site.example.com\"}"
+```
+
+## Further reading
+
+- Executor HTTP contract (lifecycle): `docs/erp-execution-backend.md`
+- `POST /v1/erp/lifecycle` payload: `src/providers/erpnext/remote-contract.ts`

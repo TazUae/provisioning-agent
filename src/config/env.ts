@@ -18,6 +18,12 @@ const EnvSchema = z.object({
    * Set explicitly to avoid surprises (recommended in all environments).
    */
   ERP_EXECUTION_BACKEND: z.enum(["docker", "remote"]).optional(),
+  /** Preferred base URL for erp-execution-service (falls back to `ERP_REMOTE_BASE_URL`). */
+  ERP_EXECUTION_BASE_URL: z.string().trim().optional(),
+  /** Bearer token for erp-execution-service (falls back to `ERP_REMOTE_TOKEN`). */
+  ERP_EXECUTION_TOKEN: z.string().trim().optional(),
+  /** Timeout for HTTP calls to erp-execution-service (falls back to `ERP_REMOTE_TIMEOUT_MS`). */
+  ERP_EXECUTION_TIMEOUT_MS: z.coerce.number().int().min(1).max(300_000).optional(),
   ERP_REMOTE_BASE_URL: z.string().trim().optional(),
   ERP_REMOTE_TOKEN: z.string().trim().optional(),
   ERP_REMOTE_TIMEOUT_MS: z.coerce.number().int().min(1).max(300_000).default(15000),
@@ -51,16 +57,16 @@ function resolveExecutionBackend(): "docker" | "remote" {
 const ERP_EXECUTION_BACKEND = resolveExecutionBackend();
 
 function assertRemoteConfig(): { ERP_REMOTE_BASE_URL: string; ERP_REMOTE_TOKEN: string } {
-  const urlRaw = raw.ERP_REMOTE_BASE_URL?.trim();
-  const tokenRaw = raw.ERP_REMOTE_TOKEN?.trim();
+  const urlRaw = (raw.ERP_EXECUTION_BASE_URL ?? raw.ERP_REMOTE_BASE_URL ?? "").trim();
+  const tokenRaw = (raw.ERP_EXECUTION_TOKEN ?? raw.ERP_REMOTE_TOKEN ?? "").trim();
   const urlParse = z.string().url().safeParse(urlRaw);
   if (!urlParse.success || !tokenRaw || tokenRaw.length < 1) {
     const missing: string[] = [];
     if (!urlParse.success) {
-      missing.push("ERP_REMOTE_BASE_URL (valid URL)");
+      missing.push("ERP_EXECUTION_BASE_URL or ERP_REMOTE_BASE_URL (valid URL)");
     }
     if (!tokenRaw || tokenRaw.length < 1) {
-      missing.push("ERP_REMOTE_TOKEN");
+      missing.push("ERP_EXECUTION_TOKEN or ERP_REMOTE_TOKEN");
     }
     throw new Error(
       `Invalid environment configuration: ERP_EXECUTION_BACKEND=remote requires ${missing.join(" and ")}`
@@ -84,14 +90,16 @@ function assertDockerProductionAllowed(): void {
 let ERP_REMOTE_BASE_URL: string | undefined;
 let ERP_REMOTE_TOKEN: string | undefined;
 
+const resolvedExecutionTimeoutMs = raw.ERP_EXECUTION_TIMEOUT_MS ?? raw.ERP_REMOTE_TIMEOUT_MS;
+
 if (ERP_EXECUTION_BACKEND === "remote") {
   const remote = assertRemoteConfig();
   ERP_REMOTE_BASE_URL = remote.ERP_REMOTE_BASE_URL;
   ERP_REMOTE_TOKEN = remote.ERP_REMOTE_TOKEN;
 } else {
   assertDockerProductionAllowed();
-  ERP_REMOTE_BASE_URL = raw.ERP_REMOTE_BASE_URL?.trim() || undefined;
-  ERP_REMOTE_TOKEN = raw.ERP_REMOTE_TOKEN?.trim() || undefined;
+  ERP_REMOTE_BASE_URL = raw.ERP_EXECUTION_BASE_URL?.trim() || raw.ERP_REMOTE_BASE_URL?.trim() || undefined;
+  ERP_REMOTE_TOKEN = raw.ERP_EXECUTION_TOKEN?.trim() || raw.ERP_REMOTE_TOKEN?.trim() || undefined;
 }
 
 export const env = {
@@ -99,5 +107,23 @@ export const env = {
   ERP_EXECUTION_BACKEND,
   ERP_REMOTE_BASE_URL,
   ERP_REMOTE_TOKEN,
+  ERP_EXECUTION_TIMEOUT_MS: resolvedExecutionTimeoutMs,
   ERP_HEALTH_CHECK_DOWNSTREAM: raw.ERP_HEALTH_CHECK_DOWNSTREAM === "true",
 };
+
+/**
+ * Connection to erp-execution-service (HTTP). Required to run the provisioning-agent HTTP server (Phase 1+).
+ * Prefer `ERP_EXECUTION_BASE_URL` / `ERP_EXECUTION_TOKEN`; `ERP_REMOTE_*` remains supported.
+ */
+export function getErpExecutionConnection(): { baseUrl: string; token: string; timeoutMs: number } {
+  const baseUrl = (raw.ERP_EXECUTION_BASE_URL ?? raw.ERP_REMOTE_BASE_URL ?? "").trim();
+  const token = (raw.ERP_EXECUTION_TOKEN ?? raw.ERP_REMOTE_TOKEN ?? "").trim();
+  const urlParse = z.string().url().safeParse(baseUrl);
+  if (!urlParse.success || token.length < 1) {
+    throw new Error(
+      "Invalid environment configuration: set ERP_EXECUTION_BASE_URL and ERP_EXECUTION_TOKEN " +
+        "(or ERP_REMOTE_BASE_URL and ERP_REMOTE_TOKEN for compatibility)"
+    );
+  }
+  return { baseUrl: urlParse.data, token, timeoutMs: resolvedExecutionTimeoutMs };
+}

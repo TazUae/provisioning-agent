@@ -13,7 +13,8 @@ export type ExecutionFailureCode =
   | "ERP_TIMEOUT"
   | "ERP_VALIDATION_FAILED"
   | "ERP_PARTIAL_SUCCESS"
-  | "SITE_ALREADY_EXISTS";
+  | "SITE_ALREADY_EXISTS"
+  | "SITE_NOT_FOUND";
 
 export type ExecutionResult = {
   ok: boolean;

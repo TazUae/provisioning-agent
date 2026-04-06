@@ -12,6 +12,7 @@ const STATUS_BY_CODE: Record<ExecutionFailureCode, number> = {
   ERP_VALIDATION_FAILED: 422,
   ERP_PARTIAL_SUCCESS: 500,
   SITE_ALREADY_EXISTS: 409,
+  SITE_NOT_FOUND: 404,
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {

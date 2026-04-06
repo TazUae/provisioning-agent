@@ -7,6 +7,7 @@ export const ProvisioningErrorCodeSchema = z.enum([
   "ERP_TIMEOUT",
   "ERP_PARTIAL_SUCCESS",
   "SITE_ALREADY_EXISTS",
+  "SITE_NOT_FOUND",
 ]);
 
 export type ProvisioningErrorCode = z.infer<typeof ProvisioningErrorCodeSchema>;

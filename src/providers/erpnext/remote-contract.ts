@@ -91,6 +91,7 @@ export const RemoteExecutionFailureCodeSchema = z.enum([
   "ERP_VALIDATION_FAILED",
   "ERP_PARTIAL_SUCCESS",
   "SITE_ALREADY_EXISTS",
+  "SITE_NOT_FOUND",
 ]);
 export type RemoteExecutionFailureCode = z.infer<typeof RemoteExecutionFailureCodeSchema>;
 

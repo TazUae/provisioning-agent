@@ -1,0 +1,42 @@
+# Provisioning agent (Phase 1): join the same user-defined network as control-plane.
+#
+# Create the shared network once (if control-plane does not already create it):
+#   docker network create control-plane
+#
+# Then:
+#   docker compose up -d --build
+
+services:
+  provisioning-agent:
+    build: .
+    container_name: provisioning-agent
+    hostname: provisioning-agent
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      PROVISIONING_API_TOKEN: ${PROVISIONING_API_TOKEN:?set PROVISIONING_API_TOKEN}
+      ERP_ADMIN_PASSWORD: ${ERP_ADMIN_PASSWORD:?set ERP_ADMIN_PASSWORD}
+      ERP_EXECUTION_BASE_URL: ${ERP_EXECUTION_BASE_URL:?set ERP_EXECUTION_BASE_URL}
+      ERP_EXECUTION_TOKEN: ${ERP_EXECUTION_TOKEN:?set ERP_EXECUTION_TOKEN}
+      ERP_EXECUTION_TIMEOUT_MS: ${ERP_EXECUTION_TIMEOUT_MS:-15000}
+    networks:
+      - control-plane
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+networks:
+  control-plane:
+    external: true
+    name: control-plane

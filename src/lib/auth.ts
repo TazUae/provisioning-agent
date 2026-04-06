@@ -1,19 +1,12 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import crypto from "node:crypto";
 import { env } from "../config/env.js";
+import { sendPublicError } from "./public-api-response.js";
 
 export async function requireBearerToken(req: FastifyRequest, reply: FastifyReply): Promise<void> {
   const auth = req.headers.authorization;
   if (!auth?.startsWith("Bearer ")) {
-    void reply.code(401).send({
-      ok: false,
-      error: {
-        code: "ERP_VALIDATION_FAILED",
-        message: "Missing Bearer token",
-        retryable: false,
-      },
-      timestamp: new Date().toISOString(),
-    });
+    sendPublicError(reply, "AUTH_ERROR", "Missing Bearer token", 401);
     return;
   }
 
@@ -25,15 +18,7 @@ export async function requireBearerToken(req: FastifyRequest, reply: FastifyRepl
     crypto.timingSafeEqual(tokenBuffer, expectedBuffer);
 
   if (!token || !valid) {
-    void reply.code(403).send({
-      ok: false,
-      error: {
-        code: "ERP_VALIDATION_FAILED",
-        message: "Invalid provisioning token",
-        retryable: false,
-      },
-      timestamp: new Date().toISOString(),
-    });
+    sendPublicError(reply, "AUTH_ERROR", "Invalid provisioning token", 401);
     return;
   }
 }
