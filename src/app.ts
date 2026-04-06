@@ -2,10 +2,11 @@ import Fastify, { type FastifyInstance } from "fastify";
 import crypto from "node:crypto";
 import type { ErpExecutionReadDbPort } from "./clients/erp-execution-read-db-port.js";
 import { ErpExecutionServiceClient } from "./clients/erp-execution-service-client.js";
-import { getErpExecutionConnection } from "./config/env.js";
+import { env, getErpExecutionConnection } from "./config/env.js";
 import { logger, loggerConfig } from "./lib/logger.js";
 import { sendPublicError } from "./lib/public-api-response.js";
 import { registerHealthRoutes } from "./routes/health.js";
+import { registerProvisionRoute } from "./routes/provision.js";
 import { registerReadDbNameRoute } from "./routes/read-db-name.js";
 
 export type BuildAppOptions = {
@@ -15,7 +16,12 @@ export type BuildAppOptions = {
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
   const client =
-    options.erpExecutionClient ?? new ErpExecutionServiceClient(getErpExecutionConnection());
+    options.erpExecutionClient ??
+    new ErpExecutionServiceClient({
+      ...getErpExecutionConnection(),
+      erpBaseDomain: env.ERP_BASE_DOMAIN,
+      apiUsernamePrefix: env.ERP_API_USERNAME_PREFIX,
+    });
 
   const app = Fastify({
     logger: loggerConfig,
@@ -34,6 +40,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   await registerHealthRoutes(app);
   await registerReadDbNameRoute(app, client);
+  await registerProvisionRoute(app, client);
 
   return app;
 }

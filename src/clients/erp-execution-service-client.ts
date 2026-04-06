@@ -1,14 +1,23 @@
-import type { ErpExecutionReadDbPort, ReadDbNameResult } from "./erp-execution-read-db-port.js";
+import type {
+  ErpExecutionReadDbPort,
+  ProvisionSiteResult,
+  ReadDbNameResult,
+} from "./erp-execution-read-db-port.js";
+import type { PublicErrorCode } from "../contracts/control-plane-api.js";
 import {
   RemoteExecutionEnvelopeSchema,
   type RemoteExecutionEnvelope,
 } from "../providers/erpnext/remote-contract.js";
+import { validateDomain, validateSite, validateUsername } from "../providers/erpnext/validation.js";
 
 export type ErpExecutionServiceClientConfig = {
   baseUrl: string;
   token: string;
   timeoutMs: number;
   fetchImpl?: typeof fetch;
+  /** Defaults match `ERP_BASE_DOMAIN` / `ERP_API_USERNAME_PREFIX` in `env.ts`. */
+  erpBaseDomain?: string;
+  apiUsernamePrefix?: string;
 };
 
 export type { ReadDbNameResult } from "./erp-execution-read-db-port.js";
@@ -46,27 +55,153 @@ function mapFailureToSiteNotFound(envelope: RemoteExecutionEnvelope): boolean {
   return envelope.error.code === "SITE_NOT_FOUND";
 }
 
+type LifecycleSuccess = {
+  durationMs: number;
+  metadata?: Record<string, string | number | boolean>;
+};
+
+type LifecyclePostResult =
+  | { ok: true; value: LifecycleSuccess }
+  | { ok: false; code: PublicErrorCode; message: string };
+
+function mapUpstreamFailure(
+  envelope: Extract<RemoteExecutionEnvelope, { ok: false }>,
+  responseStatus: number
+): { code: PublicErrorCode; message: string } {
+  const { code, message } = envelope.error;
+  switch (code) {
+    case "SITE_NOT_FOUND":
+      return { code: "SITE_NOT_FOUND", message };
+    case "ERP_VALIDATION_FAILED":
+      return { code: "VALIDATION_ERROR", message };
+    case "ERP_TIMEOUT":
+      return { code: "UPSTREAM_TIMEOUT", message };
+    default:
+      if (responseStatus >= 400 && responseStatus < 500) {
+        return { code: "UPSTREAM_HTTP_ERROR", message: safeUpstreamMessage };
+      }
+      return { code: "UPSTREAM_HTTP_ERROR", message: safeUpstreamMessage };
+  }
+}
+
 /**
  * HTTP client for erp-execution-service (`POST /v1/erp/lifecycle`).
- * Phase 1: `readDbName` only; other actions stay in the typed backend for later phases.
  */
 export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
   private readonly baseUrl: string;
   private readonly token: string;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
+  private readonly erpBaseDomain: string;
+  private readonly apiUsernamePrefix: string;
 
   constructor(config: ErpExecutionServiceClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.token = config.token;
     this.timeoutMs = config.timeoutMs;
     this.fetchImpl = config.fetchImpl ?? fetch;
+    this.erpBaseDomain = config.erpBaseDomain ?? "erp.zaidan-group.com";
+    this.apiUsernamePrefix = config.apiUsernamePrefix ?? "cp";
   }
 
   async readDbName(siteName: string): Promise<ReadDbNameResult> {
+    const result = await this.postLifecycle("readSiteDbName", { site: siteName });
+    if (!result.ok) {
+      return result;
+    }
+
+    const meta = result.value.metadata;
+    const rawDb = meta?.dbName;
+    const dbName =
+      typeof rawDb === "string"
+        ? rawDb.trim()
+        : typeof rawDb === "number" || typeof rawDb === "boolean"
+          ? String(rawDb).trim()
+          : "";
+
+    if (!dbName) {
+      return {
+        ok: false,
+        code: "INVALID_UPSTREAM_RESPONSE",
+        message: "Upstream success response did not include db_name metadata",
+      };
+    }
+
+    return { ok: true, dbName };
+  }
+
+  async provisionSite(siteName: string, opts?: { requestId?: string }): Promise<ProvisionSiteResult> {
+    let safeSite: string;
+    let derivedDomain: string;
+    let derivedApiUsername: string;
+    try {
+      safeSite = validateSite(siteName);
+      derivedDomain = validateDomain(`${safeSite}.${this.erpBaseDomain}`);
+      derivedApiUsername = validateUsername(`${this.apiUsernamePrefix}_${safeSite}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        ok: false,
+        code: "VALIDATION_ERROR",
+        message: message || "Invalid site input",
+      };
+    }
+
+    const requestId = opts?.requestId;
+    const steps: Array<{ action: string; durationMs: number }> = [];
+    let dbName: string | undefined;
+
+    const ordered: Array<{ action: string; payload: Record<string, string> }> = [
+      { action: "createSite", payload: { site: safeSite } },
+      { action: "installErp", payload: { site: safeSite } },
+      { action: "enableScheduler", payload: { site: safeSite } },
+      { action: "addDomain", payload: { site: safeSite, domain: derivedDomain } },
+      { action: "createApiUser", payload: { site: safeSite, apiUsername: derivedApiUsername } },
+    ];
+
+    for (const { action, payload } of ordered) {
+      const r = await this.postLifecycle(action, payload, requestId);
+      if (!r.ok) {
+        return r;
+      }
+      steps.push({ action, durationMs: r.value.durationMs });
+      if (action === "createSite") {
+        const raw = r.value.metadata?.dbName;
+        const extracted =
+          typeof raw === "string"
+            ? raw.trim()
+            : typeof raw === "number" || typeof raw === "boolean"
+              ? String(raw).trim()
+              : "";
+        if (extracted) {
+          dbName = extracted;
+        }
+      }
+    }
+
+    return {
+      ok: true,
+      data: {
+        site_name: safeSite,
+        steps,
+        ...(dbName ? { db_name: dbName } : {}),
+      },
+    };
+  }
+
+  private async postLifecycle(
+    action: string,
+    payload: Record<string, unknown>,
+    requestId?: string
+  ): Promise<LifecyclePostResult> {
     const url = new URL("/v1/erp/lifecycle", this.baseUrl).toString();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    const body: Record<string, unknown> = { action, payload };
+    if (requestId) {
+      body.requestId = requestId;
+    }
 
     try {
       const response = await this.fetchImpl(url, {
@@ -74,11 +209,9 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${this.token}`,
+          ...(requestId ? { "x-request-id": requestId } : {}),
         },
-        body: JSON.stringify({
-          action: "readSiteDbName",
-          payload: { site: siteName },
-        }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
 
@@ -139,24 +272,9 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
       const envelope = envelopeParsed.data;
 
       if (!envelope.ok) {
-        if (envelope.error.code === "SITE_NOT_FOUND") {
-          return {
-            ok: false,
-            code: "SITE_NOT_FOUND",
-            message: envelope.error.message,
-          };
-        }
-        if (response.status >= 400 && response.status < 500) {
-          return {
-            ok: false,
-            code: "UPSTREAM_HTTP_ERROR",
-            message: safeUpstreamMessage,
-          };
-        }
         return {
           ok: false,
-          code: "UPSTREAM_HTTP_ERROR",
-          message: safeUpstreamMessage,
+          ...mapUpstreamFailure(envelope, response.status),
         };
       }
 
@@ -168,24 +286,13 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
         };
       }
 
-      const meta = envelope.data.metadata;
-      const rawDb = meta?.dbName;
-      const dbName =
-        typeof rawDb === "string"
-          ? rawDb.trim()
-          : typeof rawDb === "number" || typeof rawDb === "boolean"
-            ? String(rawDb).trim()
-            : "";
-
-      if (!dbName) {
-        return {
-          ok: false,
-          code: "INVALID_UPSTREAM_RESPONSE",
-          message: "Upstream success response did not include db_name metadata",
-        };
-      }
-
-      return { ok: true, dbName };
+      return {
+        ok: true,
+        value: {
+          durationMs: envelope.data.durationMs,
+          metadata: envelope.data.metadata,
+        },
+      };
     } catch (error) {
       if (isAbortError(error)) {
         return {

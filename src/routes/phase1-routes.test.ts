@@ -8,6 +8,10 @@ process.env.ERP_ADMIN_PASSWORD ??= "test-admin-password";
 test("GET /health returns stable success contract", async () => {
   const mock: ErpExecutionReadDbPort = {
     readDbName: async () => ({ ok: true, dbName: "x" }),
+    provisionSite: async () => ({
+      ok: true,
+      data: { site_name: "acme", steps: [] },
+    }),
   };
   const { buildApp } = await import("../app.js");
   const app = await buildApp({ erpExecutionClient: mock });
@@ -23,6 +27,10 @@ test("GET /health returns stable success contract", async () => {
 test("POST /sites/read-db-name returns db_name on success", async () => {
   const mock: ErpExecutionReadDbPort = {
     readDbName: async () => ({ ok: true, dbName: "_tenant_db" }),
+    provisionSite: async () => ({
+      ok: true,
+      data: { site_name: "acme", steps: [] },
+    }),
   };
   const { buildApp } = await import("../app.js");
   const app = await buildApp({ erpExecutionClient: mock });
@@ -45,6 +53,10 @@ test("POST /sites/read-db-name returns db_name on success", async () => {
 test("POST /sites/read-db-name without Bearer returns AUTH_ERROR", async () => {
   const mock: ErpExecutionReadDbPort = {
     readDbName: async () => ({ ok: true, dbName: "x" }),
+    provisionSite: async () => ({
+      ok: true,
+      data: { site_name: "acme", steps: [] },
+    }),
   };
   const { buildApp } = await import("../app.js");
   const app = await buildApp({ erpExecutionClient: mock });
@@ -68,6 +80,10 @@ test("POST /sites/read-db-name maps SITE_NOT_FOUND from client", async () => {
       code: "SITE_NOT_FOUND",
       message: "missing",
     }),
+    provisionSite: async () => ({
+      ok: true,
+      data: { site_name: "acme", steps: [] },
+    }),
   };
   const { buildApp } = await import("../app.js");
   const app = await buildApp({ erpExecutionClient: mock });
@@ -84,5 +100,66 @@ test("POST /sites/read-db-name maps SITE_NOT_FOUND from client", async () => {
   const body = JSON.parse(res.body) as { success: boolean; error: { code: string } };
   assert.equal(body.success, false);
   assert.equal(body.error.code, "SITE_NOT_FOUND");
+  await app.close();
+});
+
+test("POST /provision returns success contract", async () => {
+  const mock: ErpExecutionReadDbPort = {
+    readDbName: async () => ({ ok: true, dbName: "x" }),
+    provisionSite: async () => ({
+      ok: true,
+      data: {
+        site_name: "acme",
+        steps: [
+          { action: "createSite", durationMs: 10 },
+          { action: "installErp", durationMs: 20 },
+        ],
+        db_name: "_tenant_acme",
+      },
+    }),
+  };
+  const { buildApp } = await import("../app.js");
+  const app = await buildApp({ erpExecutionClient: mock });
+  const res = await app.inject({
+    method: "POST",
+    url: "/provision",
+    headers: {
+      authorization: `Bearer ${process.env.PROVISIONING_API_TOKEN}`,
+      "content-type": "application/json",
+    },
+    payload: JSON.stringify({ site_name: "acme" }),
+  });
+  assert.equal(res.statusCode, 200);
+  const body = JSON.parse(res.body) as {
+    success: boolean;
+    data: { site_name: string; steps: Array<{ action: string; durationMs: number }>; db_name?: string };
+  };
+  assert.equal(body.success, true);
+  assert.equal(body.data.site_name, "acme");
+  assert.equal(body.data.db_name, "_tenant_acme");
+  assert.equal(body.data.steps.length, 2);
+  await app.close();
+});
+
+test("POST /provision without Bearer returns AUTH_ERROR", async () => {
+  const mock: ErpExecutionReadDbPort = {
+    readDbName: async () => ({ ok: true, dbName: "x" }),
+    provisionSite: async () => ({
+      ok: true,
+      data: { site_name: "acme", steps: [] },
+    }),
+  };
+  const { buildApp } = await import("../app.js");
+  const app = await buildApp({ erpExecutionClient: mock });
+  const res = await app.inject({
+    method: "POST",
+    url: "/provision",
+    headers: { "content-type": "application/json" },
+    payload: JSON.stringify({ site_name: "acme" }),
+  });
+  assert.equal(res.statusCode, 401);
+  const body = JSON.parse(res.body) as { success: boolean; error: { code: string } };
+  assert.equal(body.success, false);
+  assert.equal(body.error.code, "AUTH_ERROR");
   await app.close();
 });

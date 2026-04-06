@@ -47,6 +47,22 @@ export const ApiSuccessHealthSchema = z.object({
 
 export type ApiSuccessHealth = z.infer<typeof ApiSuccessHealthSchema>;
 
+export const ApiSuccessProvisionSchema = z.object({
+  success: z.literal(true),
+  data: z.object({
+    site_name: z.string().min(1),
+    steps: z.array(
+      z.object({
+        action: z.string().min(1),
+        durationMs: z.number().nonnegative(),
+      })
+    ),
+    db_name: z.string().min(1).optional(),
+  }),
+});
+
+export type ApiSuccessProvision = z.infer<typeof ApiSuccessProvisionSchema>;
+
 /** Frappe-compatible site slug (3–50 chars) or lowercase FQDN. */
 export const SiteNameSchema = z
   .string()
@@ -65,3 +81,7 @@ export const ReadDbNameRequestSchema = z.object({
 });
 
 export type ReadDbNameRequest = z.infer<typeof ReadDbNameRequestSchema>;
+
+export const ProvisionRequestSchema = ReadDbNameRequestSchema;
+
+export type ProvisionRequest = z.infer<typeof ProvisionRequestSchema>;

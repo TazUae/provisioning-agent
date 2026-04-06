@@ -114,3 +114,37 @@ test("readDbName maps invalid JSON body to INVALID_UPSTREAM_RESPONSE", async () 
     assert.equal(result.code, "INVALID_UPSTREAM_RESPONSE");
   }
 });
+
+test("provisionSite runs lifecycle sequence and aggregates steps", async () => {
+  let calls = 0;
+  const fetchMock: typeof fetch = async (_input, init) => {
+    calls += 1;
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    const durationMs = calls === 1 ? 100 : 10;
+    const metadata =
+      body.action === "createSite" ? { dbName: "_acme_db" } : body.action === "readSiteDbName" ? {} : {};
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        data: { durationMs, metadata },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    );
+  };
+  const client = new ErpExecutionServiceClient({
+    ...baseConfig,
+    fetchImpl: fetchMock,
+    erpBaseDomain: "example.test",
+    apiUsernamePrefix: "cp",
+  });
+  const result = await client.provisionSite("acme");
+  assert.equal(calls, 5);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.data.site_name, "acme");
+    assert.equal(result.data.db_name, "_acme_db");
+    assert.equal(result.data.steps.length, 5);
+    assert.equal(result.data.steps[0]?.action, "createSite");
+    assert.equal(result.data.steps[4]?.action, "createApiUser");
+  }
+});

@@ -2,6 +2,7 @@ import type { FastifyReply } from "fastify";
 import type {
   ApiFailureResponse,
   ApiSuccessHealth,
+  ApiSuccessProvision,
   ApiSuccessReadDbName,
   PublicErrorCode,
 } from "../contracts/control-plane-api.js";
@@ -36,6 +37,17 @@ export function sendPublicSuccessHealth(reply: FastifyReply): void {
   const body: ApiSuccessHealth = {
     success: true,
     data: { status: "ok", service: "provisioning-agent" },
+  };
+  void reply.code(200).send(body);
+}
+
+export function sendPublicSuccessProvision(
+  reply: FastifyReply,
+  data: ApiSuccessProvision["data"]
+): void {
+  const body: ApiSuccessProvision = {
+    success: true,
+    data,
   };
   void reply.code(200).send(body);
 }
