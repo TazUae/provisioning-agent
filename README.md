@@ -65,13 +65,11 @@ The full key set is listed in **`.env.example`** (placeholders only). In product
 |----------|---------|---------|
 | `PORT` | `8080` | Listen port. |
 | `NODE_ENV` | `development` | `development` \| `test` \| `production`. |
-| `ERP_EXECUTION_BACKEND` | (see env) | `docker` or `remote`; when unset, non-production defaults to `docker`, production defaults to `remote`. |
 | `ERP_REMOTE_TIMEOUT_MS` | `15000` | HTTP timeout for executor calls. |
-| `ERP_BASE_DOMAIN` | `erp.zaidan-group.com` | Site derivation for provisioning. |
-| `ERP_API_USERNAME_PREFIX` | `cp` | Prefix for API usernames. |
-| `ERP_COMMAND_TIMEOUT_MS` | `120000` | Timeout for bench/docker subprocess operations. |
+| `ERP_BASE_DOMAIN` | `erp.zaidan-group.com` | Site derivation for provisioning (transitional; see `docs/architecture.md`). |
+| `ERP_API_USERNAME_PREFIX` | `cp` | Prefix for API usernames (transitional). |
 
-Phase 1 HTTP routes use the **erp-execution-service** client (`ERP_REMOTE_*`). Docker bench bridge paths (`ERP_EXECUTION_BACKEND=docker`) use fixed defaults in `src/config/docker-bench-defaults.ts`, not environment variables.
+Phase 1 HTTP routes use only the **erp-execution-service** client (`ERP_REMOTE_*`).
 
 ## Local development
 

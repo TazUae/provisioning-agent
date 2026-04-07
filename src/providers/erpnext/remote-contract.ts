@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { ExecutionFailureCode } from "./erp-execution-backend.js";
 
 export const RemoteErpActionSchema = z.enum([
   "createSite",
@@ -129,6 +128,6 @@ export type RemoteExecutionEndpointConfig = {
   timeoutMs?: number;
 };
 
-export function isExecutionFailureCode(code: string): code is ExecutionFailureCode {
+export function isExecutionFailureCode(code: string): code is RemoteExecutionFailureCode {
   return RemoteExecutionFailureCodeSchema.safeParse(code).success;
 }
