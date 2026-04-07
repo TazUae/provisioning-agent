@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { ErpExecutionReadDbPort } from "../clients/erp-execution-read-db-port.js";
 import { ProvisionRequestSchema } from "../contracts/control-plane-api.js";
 import { requireBearerToken } from "../lib/auth.js";
+import { logger } from "../lib/logger.js";
 import {
   httpStatusForPublicError,
   sendPublicError,
@@ -23,6 +24,8 @@ export async function registerProvisionRoute(
         sendPublicError(reply, "VALIDATION_ERROR", message, 400);
         return;
       }
+
+      logger.info({ requestId: req.id }, "[Agent] Received request");
 
       const result = await client.provisionSite(parsed.data, { requestId: req.id });
 

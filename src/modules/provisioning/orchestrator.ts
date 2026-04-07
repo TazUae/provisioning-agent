@@ -1,6 +1,7 @@
 import type { ProvisionSiteResult } from "../../clients/erp-execution-read-db-port.js";
 import type { PublicErrorCode } from "../../contracts/control-plane-api.js";
 import { extractDbNameFromMetadata } from "../../lib/erp-metadata-db-name.js";
+import { logger } from "../../lib/logger.js";
 import {
   DOMAIN_REGEX,
   normalizeOpaqueSiteString,
@@ -72,6 +73,9 @@ export async function orchestrateProvision(input: OrchestrateProvisionInput): Pr
   }
 
   const requestId = input.requestId;
+  const correlation = requestId ? { requestId } : {};
+  logger.info(correlation, "[Agent] Starting orchestration (temporary)");
+
   const steps: Array<{ action: string; durationMs: number }> = [];
   let dbName: string | undefined;
 
@@ -85,10 +89,12 @@ export async function orchestrateProvision(input: OrchestrateProvisionInput): Pr
   ];
 
   for (const { action, payload } of ordered) {
+    logger.info({ ...correlation, step: action }, `[Agent] Calling execution step: ${action}`);
     const r = await input.postLifecycle(action, payload, requestId);
     if (!r.ok) {
       return r;
     }
+    logger.info({ ...correlation, step: action }, "[Agent] Step completed");
     steps.push({ action, durationMs: r.value.durationMs });
     if (action === "createSite") {
       const extracted = extractDbNameFromMetadata(r.value.metadata);
@@ -97,6 +103,8 @@ export async function orchestrateProvision(input: OrchestrateProvisionInput): Pr
       }
     }
   }
+
+  logger.info(correlation, "[Agent] Provisioning completed");
 
   return {
     ok: true,
