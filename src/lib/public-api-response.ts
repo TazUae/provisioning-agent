@@ -36,7 +36,7 @@ export function sendPublicSuccessReadDbName(reply: FastifyReply, dbName: string)
 export function sendPublicSuccessHealth(reply: FastifyReply): void {
   const body: ApiSuccessHealth = {
     success: true,
-    data: { status: "ok", service: "provisioning-agent" },
+    data: { status: "ok" },
   };
   void reply.code(200).send(body);
 }

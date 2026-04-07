@@ -40,7 +40,6 @@ export const ApiSuccessHealthSchema = z.object({
   success: z.literal(true),
   data: z.object({
     status: z.literal("ok"),
-    service: z.literal("provisioning-agent"),
   }),
 });
 
