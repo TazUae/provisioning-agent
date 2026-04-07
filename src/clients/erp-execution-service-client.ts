@@ -14,6 +14,7 @@ import {
   orchestrateProvision,
   type LifecyclePostResult,
 } from "../modules/provisioning/orchestrator.js";
+import { normalizeOpaqueSiteString } from "../providers/erpnext/validation.js";
 
 export type ErpExecutionServiceClientConfig = {
   baseUrl: string;
@@ -101,7 +102,14 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
   }
 
   async readDbName(siteName: string): Promise<ReadDbNameResult> {
-    const result = await this.postLifecycle("readSiteDbName", { site: siteName });
+    let site: string;
+    try {
+      site = normalizeOpaqueSiteString(siteName);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, code: "VALIDATION_ERROR", message: message || "Invalid site input" };
+    }
+    const result = await this.postLifecycle("readSiteDbName", { site });
     if (!result.ok) {
       return result;
     }

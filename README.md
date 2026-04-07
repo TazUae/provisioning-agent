@@ -45,7 +45,7 @@ Typed error codes include: `AUTH_ERROR`, `VALIDATION_ERROR`, `SITE_NOT_FOUND`, `
 { "site_name": "<site-slug-or-fqdn>" }
 ```
 
-`site_name` must be a valid Frappe-style site slug (`^[a-z0-9-]+$`, length 3–50) or a lowercase FQDN.
+`site_name` is an opaque non-empty string (max 2048 chars); stricter rules are enforced upstream.
 
 ## Environment variables
 

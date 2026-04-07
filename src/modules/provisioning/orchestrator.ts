@@ -1,7 +1,19 @@
 import type { ProvisionSiteResult } from "../../clients/erp-execution-read-db-port.js";
 import type { PublicErrorCode } from "../../contracts/control-plane-api.js";
 import { extractDbNameFromMetadata } from "../../lib/erp-metadata-db-name.js";
-import { validateDomain, validateSite, validateUsername } from "../../providers/erpnext/validation.js";
+import {
+  DOMAIN_REGEX,
+  normalizeOpaqueSiteString,
+  validateDomain,
+  validateUsername,
+} from "../../providers/erpnext/validation.js";
+
+function resolveDerivedDomainForProvision(safeSite: string, erpBaseDomain: string): string {
+  if (DOMAIN_REGEX.test(safeSite)) {
+    return validateDomain(safeSite);
+  }
+  return validateDomain(`${safeSite}.${erpBaseDomain}`);
+}
 
 export type LifecyclePostResult =
   | { ok: true; value: { durationMs: number; metadata?: Record<string, string | number | boolean> } }
@@ -33,14 +45,14 @@ export async function orchestrateProvision(input: OrchestrateProvisionInput): Pr
   let derivedDomain: string;
   let derivedApiUsername: string;
   try {
-    safeSite = validateSite(input.siteName);
+    safeSite = normalizeOpaqueSiteString(input.siteName);
     const domainFromPayload = input.domain?.trim();
     if (domainFromPayload) {
       // ⚠️ Remove fallback logic once Control Plane provides full payload
       derivedDomain = validateDomain(domainFromPayload);
     } else {
       // ⚠️ TEMPORARY — move to ERP Execution Service (tenant domain policy).
-      derivedDomain = validateDomain(`${safeSite}.${input.erpBaseDomain}`);
+      derivedDomain = resolveDerivedDomainForProvision(safeSite, input.erpBaseDomain);
     }
     const apiUserFromPayload = input.apiUsername?.trim();
     if (apiUserFromPayload) {

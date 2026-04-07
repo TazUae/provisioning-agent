@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { DOMAIN_REGEX, SITE_REGEX } from "../providers/erpnext/validation.js";
 
 /** Typed error codes returned to Control Plane (stable contract). */
 export const PublicErrorCodeSchema = z.enum([
@@ -63,18 +62,10 @@ export const ApiSuccessProvisionSchema = z.object({
 
 export type ApiSuccessProvision = z.infer<typeof ApiSuccessProvisionSchema>;
 
-/** Frappe-compatible site slug (3–50 chars) or lowercase FQDN. */
-export const SiteNameSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(253)
-  .refine((s) => {
-    if (DOMAIN_REGEX.test(s)) {
-      return true;
-    }
-    return s.length >= 3 && s.length <= 50 && SITE_REGEX.test(s);
-  }, "site_name must be a valid site slug (lowercase letters, digits, hyphens) or a valid FQDN");
+/**
+ * Transitional: non-empty opaque site key. Validation responsibility will move to Control Plane or ERP Execution.
+ */
+export const SiteNameSchema = z.string().trim().min(1).max(2048);
 
 export const ReadDbNameRequestSchema = z.object({
   site_name: SiteNameSchema,

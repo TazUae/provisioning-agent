@@ -1,16 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateDomain, validateSite, validateUsername } from "./validation.js";
+import { normalizeOpaqueSiteString, validateDomain, validateUsername } from "./validation.js";
 
-test("validateSite accepts conservative site slug", () => {
-  assert.equal(validateSite("acme-1"), "acme-1");
+test("normalizeOpaqueSiteString accepts trimmed non-empty strings", () => {
+  assert.equal(normalizeOpaqueSiteString("  acme  "), "acme");
+  assert.equal(normalizeOpaqueSiteString("tenant.example.com"), "tenant.example.com");
 });
 
-test("validateSite rejects invalid site values", () => {
-  assert.throws(() => validateSite("ACME"), /invalid site format/i);
-  assert.throws(() => validateSite("acme.example"), /invalid site format/i);
-  assert.throws(() => validateSite("ab"));
-  assert.throws(() => validateSite("a".repeat(51)));
+test("normalizeOpaqueSiteString rejects empty", () => {
+  assert.throws(() => normalizeOpaqueSiteString("   "), /required/i);
 });
 
 test("validateDomain accepts valid FQDN", () => {
