@@ -136,6 +136,16 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
    * Execution instead.
    */
   async provisionSite(body: ProvisionSiteRequestBody, opts?: { requestId?: string }): Promise<ProvisionSiteResult> {
+    return this.executeProvision(body, opts);
+  }
+
+  /**
+   * TODO: Replace with single POST /v1/erp/provision when available.
+   */
+  private async executeProvision(
+    body: ProvisionSiteRequestBody,
+    opts?: { requestId?: string }
+  ): Promise<ProvisionSiteResult> {
     return orchestrateProvision({
       siteName: body.site_name,
       domain: body.domain,
