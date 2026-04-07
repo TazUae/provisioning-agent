@@ -8,7 +8,7 @@ Stable provisioning interface between **Control Plane** and **erp-execution-serv
 Control Plane → provisioning-agent → erp-execution-service → ERP / Frappe
 ```
 
-This service is an **orchestration and normalization** layer only: it authenticates callers, validates inputs, calls the executor over HTTP, and maps responses to a stable JSON contract. It does not run bench, Docker, or Frappe directly in production.
+This service authenticates callers, validates minimal inputs, calls the executor over HTTP, and maps responses to a stable JSON contract. **Transitional in-process orchestration** for `/provision` exists until a single ERP Execution API is available; see **`docs/architecture.md`**. The agent does not run bench, Docker, or Frappe.
 
 ## Phase 1 endpoints
 
@@ -16,6 +16,7 @@ This service is an **orchestration and normalization** layer only: it authentica
 |--------|------|------|
 | `GET` | `/health` | No |
 | `POST` | `/sites/read-db-name` | `Authorization: Bearer <PROVISIONING_API_TOKEN>` |
+| `POST` | `/provision` | `Authorization: Bearer <PROVISIONING_API_TOKEN>` |
 
 ### Response shape (Control Plane contract)
 
@@ -135,5 +136,6 @@ curl -sS -X POST "http://127.0.0.1:8080/sites/read-db-name" \
 
 ## Further reading
 
+- Transitional architecture and migration: `docs/architecture.md`
 - Executor HTTP contract (lifecycle): `docs/erp-execution-backend.md`
 - `POST /v1/erp/lifecycle` payload: `src/providers/erpnext/remote-contract.ts`
