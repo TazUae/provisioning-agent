@@ -9,6 +9,10 @@ export type LifecyclePostResult =
 
 export type OrchestrateProvisionInput = {
   siteName: string;
+  /** When provided (non-empty), forwarded instead of deriving from `erpBaseDomain`. */
+  domain?: string;
+  /** When provided (non-empty), forwarded instead of prefix-based derivation. */
+  apiUsername?: string;
   requestId?: string;
   erpBaseDomain: string;
   apiUsernamePrefix: string;
@@ -30,10 +34,22 @@ export async function orchestrateProvision(input: OrchestrateProvisionInput): Pr
   let derivedApiUsername: string;
   try {
     safeSite = validateSite(input.siteName);
-    // ⚠️ TEMPORARY — move to ERP Execution Service (tenant domain policy).
-    derivedDomain = validateDomain(`${safeSite}.${input.erpBaseDomain}`);
-    // ⚠️ TEMPORARY — move to ERP Execution Service (API user naming policy).
-    derivedApiUsername = validateUsername(`${input.apiUsernamePrefix}_${safeSite}`);
+    const domainFromPayload = input.domain?.trim();
+    if (domainFromPayload) {
+      // ⚠️ Remove fallback logic once Control Plane provides full payload
+      derivedDomain = validateDomain(domainFromPayload);
+    } else {
+      // ⚠️ TEMPORARY — move to ERP Execution Service (tenant domain policy).
+      derivedDomain = validateDomain(`${safeSite}.${input.erpBaseDomain}`);
+    }
+    const apiUserFromPayload = input.apiUsername?.trim();
+    if (apiUserFromPayload) {
+      // ⚠️ Remove fallback logic once Control Plane provides full payload
+      derivedApiUsername = validateUsername(apiUserFromPayload);
+    } else {
+      // ⚠️ TEMPORARY — move to ERP Execution Service (API user naming policy).
+      derivedApiUsername = validateUsername(`${input.apiUsernamePrefix}_${safeSite}`);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {

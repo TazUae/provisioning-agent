@@ -82,6 +82,10 @@ export const ReadDbNameRequestSchema = z.object({
 
 export type ReadDbNameRequest = z.infer<typeof ReadDbNameRequestSchema>;
 
-export const ProvisionRequestSchema = ReadDbNameRequestSchema;
+/** Optional fields for forward-compatible pass-through; agent falls back until Control Plane sends full payload. */
+export const ProvisionRequestSchema = ReadDbNameRequestSchema.extend({
+  domain: z.string().trim().min(1).optional(),
+  api_username: z.string().trim().min(1).optional(),
+});
 
 export type ProvisionRequest = z.infer<typeof ProvisionRequestSchema>;

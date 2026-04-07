@@ -155,7 +155,7 @@ test("provisionSite runs lifecycle sequence and aggregates steps", async () => {
     erpBaseDomain: "example.test",
     apiUsernamePrefix: "cp",
   });
-  const result = await client.provisionSite("acme");
+  const result = await client.provisionSite({ site_name: "acme" });
   assert.equal(calls, 5);
   assert.equal(result.ok, true);
   if (result.ok) {
@@ -186,7 +186,7 @@ test("provisionSite includes db_name from createSite when metadata uses legacy d
     erpBaseDomain: "example.test",
     apiUsernamePrefix: "cp",
   });
-  const result = await client.provisionSite("legacy");
+  const result = await client.provisionSite({ site_name: "legacy" });
   assert.equal(result.ok, true);
   if (result.ok) {
     assert.equal(result.data.db_name, "_legacy_db");

@@ -1,5 +1,6 @@
 import type {
   ErpExecutionReadDbPort,
+  ProvisionSiteRequestBody,
   ProvisionSiteResult,
   ReadDbNameResult,
 } from "./erp-execution-read-db-port.js";
@@ -126,9 +127,11 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
    * service owns ordering and side effects. Do not add new business steps here—extend ERP
    * Execution instead.
    */
-  async provisionSite(siteName: string, opts?: { requestId?: string }): Promise<ProvisionSiteResult> {
+  async provisionSite(body: ProvisionSiteRequestBody, opts?: { requestId?: string }): Promise<ProvisionSiteResult> {
     return orchestrateProvision({
-      siteName,
+      siteName: body.site_name,
+      domain: body.domain,
+      apiUsername: body.api_username,
       requestId: opts?.requestId,
       erpBaseDomain: this.erpBaseDomain,
       apiUsernamePrefix: this.apiUsernamePrefix,

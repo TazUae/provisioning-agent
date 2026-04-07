@@ -24,7 +24,7 @@ export async function registerProvisionRoute(
         return;
       }
 
-      const result = await client.provisionSite(parsed.data.site_name, { requestId: req.id });
+      const result = await client.provisionSite(parsed.data, { requestId: req.id });
 
       if (!result.ok) {
         sendPublicError(reply, result.code, result.message, httpStatusForPublicError(result.code));
