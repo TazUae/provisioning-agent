@@ -124,13 +124,23 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
     return { ok: true, dbName };
   }
 
+  /**
+   * Provisions a site by orchestrating multiple calls to `POST /v1/erp/lifecycle`.
+   *
+   * **TEMPORARY:** This multi-step orchestration lives in the agent only until migration to a
+   * single ERP Execution endpoint (planned: `POST /v1/erp/provision`), where the execution
+   * service owns ordering and side effects. Do not add new business steps here—extend ERP
+   * Execution instead.
+   */
   async provisionSite(siteName: string, opts?: { requestId?: string }): Promise<ProvisionSiteResult> {
     let safeSite: string;
     let derivedDomain: string;
     let derivedApiUsername: string;
     try {
       safeSite = validateSite(siteName);
+      // ⚠️ TEMPORARY — move to ERP Execution Service (tenant domain policy).
       derivedDomain = validateDomain(`${safeSite}.${this.erpBaseDomain}`);
+      // ⚠️ TEMPORARY — move to ERP Execution Service (API user naming policy).
       derivedApiUsername = validateUsername(`${this.apiUsernamePrefix}_${safeSite}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -145,6 +155,7 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
     const steps: Array<{ action: string; durationMs: number }> = [];
     let dbName: string | undefined;
 
+    // ⚠️ TEMPORARY — move to ERP Execution Service (workflow / saga owned upstream).
     const ordered: Array<{ action: string; payload: Record<string, string> }> = [
       { action: "createSite", payload: { site: safeSite } },
       { action: "installErp", payload: { site: safeSite } },
