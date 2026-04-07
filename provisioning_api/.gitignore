@@ -1,7 +1,0 @@
-# Local overrides and secret bundles (not committed). Template `.env` at repo root is committed.
-.env.local
-.env.production
-.env.secrets
-**/.env.local
-**/.env.production
-**/.env.secrets
