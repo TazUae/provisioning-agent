@@ -8,8 +8,11 @@ import {
   RemoteExecutionEnvelopeSchema,
   type RemoteExecutionEnvelope,
 } from "../providers/erpnext/remote-contract.js";
-import { validateDomain, validateSite, validateUsername } from "../providers/erpnext/validation.js";
 import { extractDbNameFromMetadata } from "../lib/erp-metadata-db-name.js";
+import {
+  orchestrateProvision,
+  type LifecyclePostResult,
+} from "../modules/provisioning/orchestrator.js";
 
 export type ErpExecutionServiceClientConfig = {
   baseUrl: string;
@@ -55,15 +58,6 @@ function mapFailureToSiteNotFound(envelope: RemoteExecutionEnvelope): boolean {
   }
   return envelope.error.code === "SITE_NOT_FOUND";
 }
-
-type LifecycleSuccess = {
-  durationMs: number;
-  metadata?: Record<string, string | number | boolean>;
-};
-
-type LifecyclePostResult =
-  | { ok: true; value: LifecycleSuccess }
-  | { ok: false; code: PublicErrorCode; message: string };
 
 function mapUpstreamFailure(
   envelope: Extract<RemoteExecutionEnvelope, { ok: false }>,
@@ -133,59 +127,13 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
    * Execution instead.
    */
   async provisionSite(siteName: string, opts?: { requestId?: string }): Promise<ProvisionSiteResult> {
-    let safeSite: string;
-    let derivedDomain: string;
-    let derivedApiUsername: string;
-    try {
-      safeSite = validateSite(siteName);
-      // ⚠️ TEMPORARY — move to ERP Execution Service (tenant domain policy).
-      derivedDomain = validateDomain(`${safeSite}.${this.erpBaseDomain}`);
-      // ⚠️ TEMPORARY — move to ERP Execution Service (API user naming policy).
-      derivedApiUsername = validateUsername(`${this.apiUsernamePrefix}_${safeSite}`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return {
-        ok: false,
-        code: "VALIDATION_ERROR",
-        message: message || "Invalid site input",
-      };
-    }
-
-    const requestId = opts?.requestId;
-    const steps: Array<{ action: string; durationMs: number }> = [];
-    let dbName: string | undefined;
-
-    // ⚠️ TEMPORARY — move to ERP Execution Service (workflow / saga owned upstream).
-    const ordered: Array<{ action: string; payload: Record<string, string> }> = [
-      { action: "createSite", payload: { site: safeSite } },
-      { action: "installErp", payload: { site: safeSite } },
-      { action: "enableScheduler", payload: { site: safeSite } },
-      { action: "addDomain", payload: { site: safeSite, domain: derivedDomain } },
-      { action: "createApiUser", payload: { site: safeSite, apiUsername: derivedApiUsername } },
-    ];
-
-    for (const { action, payload } of ordered) {
-      const r = await this.postLifecycle(action, payload, requestId);
-      if (!r.ok) {
-        return r;
-      }
-      steps.push({ action, durationMs: r.value.durationMs });
-      if (action === "createSite") {
-        const extracted = extractDbNameFromMetadata(r.value.metadata);
-        if (extracted) {
-          dbName = extracted;
-        }
-      }
-    }
-
-    return {
-      ok: true,
-      data: {
-        site_name: safeSite,
-        steps,
-        ...(dbName ? { db_name: dbName } : {}),
-      },
-    };
+    return orchestrateProvision({
+      siteName,
+      requestId: opts?.requestId,
+      erpBaseDomain: this.erpBaseDomain,
+      apiUsernamePrefix: this.apiUsernamePrefix,
+      postLifecycle: (action, payload, requestId) => this.postLifecycle(action, payload, requestId),
+    });
   }
 
   private async postLifecycle(
