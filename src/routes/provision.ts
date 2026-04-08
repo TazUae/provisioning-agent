@@ -111,22 +111,10 @@ export async function registerProvisionRoute(
         return;
       }
 
-      const mappedPayload = {
-        site: parsed.data.siteName,
-        context: {
-          domain: parsed.data.domain,
-          apiUsername: parsed.data.apiUsername,
-        },
-      };
-
       const provisionCandidate = {
-        site_name: mappedPayload.site,
-        ...(mappedPayload.context.domain !== undefined
-          ? { domain: mappedPayload.context.domain }
-          : {}),
-        ...(mappedPayload.context.apiUsername !== undefined
-          ? { api_username: mappedPayload.context.apiUsername }
-          : {}),
+        site_name: parsed.data.siteName,
+        ...(parsed.data.domain !== undefined ? { domain: parsed.data.domain } : {}),
+        ...(parsed.data.apiUsername !== undefined ? { api_username: parsed.data.apiUsername } : {}),
       };
 
       const provisionParsed = ProvisionRequestSchema.safeParse(provisionCandidate);

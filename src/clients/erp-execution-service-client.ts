@@ -10,10 +10,7 @@ import {
   type RemoteExecutionEnvelope,
 } from "../providers/erpnext/remote-contract.js";
 import { extractDbNameFromMetadata } from "../lib/erp-metadata-db-name.js";
-import {
-  orchestrateProvision,
-  type LifecyclePostResult,
-} from "../modules/provisioning/orchestrator.js";
+import { executeCreateSiteFromProvision } from "../modules/provisioning/orchestrator.js";
 import { normalizeOpaqueSiteString } from "../providers/erpnext/validation.js";
 
 export type ErpExecutionServiceClientConfig = {
@@ -81,8 +78,20 @@ function mapUpstreamFailure(
   }
 }
 
+type ExecutionEnvelopeOk = {
+  ok: true;
+  value: { durationMs: number; metadata?: Record<string, string | number | boolean> };
+};
+
+type ExecutionEnvelopeErr = {
+  ok: false;
+  code: PublicErrorCode;
+  message: string;
+  details?: unknown;
+};
+
 /**
- * HTTP client for erp-execution-service (`POST /v1/erp/lifecycle`).
+ * HTTP client for erp-execution-service (`POST /sites/create`, `POST /sites/read-db-name`).
  */
 export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
   private readonly baseUrl: string;
@@ -109,7 +118,8 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, code: "VALIDATION_ERROR", message: message || "Invalid site input" };
     }
-    const result = await this.postLifecycle("readSiteDbName", { site });
+    const body = { siteName: site };
+    const result = await this.postExecutionEnvelope("/sites/read-db-name", body);
     if (!result.ok) {
       return result;
     }
@@ -127,56 +137,62 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
     return { ok: true, dbName };
   }
 
-  /**
-   * Provisions a site by orchestrating multiple calls to `POST /v1/erp/lifecycle`.
-   *
-   * **TEMPORARY:** This multi-step orchestration lives in the agent only until migration to a
-   * single ERP Execution endpoint (planned: `POST /v1/erp/provision`), where the execution
-   * service owns ordering and side effects. Do not add new business steps here—extend ERP
-   * Execution instead.
-   */
   async provisionSite(body: ProvisionSiteRequestBody, opts?: { requestId?: string }): Promise<ProvisionSiteResult> {
     return this.executeProvision(body, opts);
   }
 
-  /**
-   * TODO: Replace with single POST /v1/erp/provision when available.
-   */
   private async executeProvision(
     body: ProvisionSiteRequestBody,
     opts?: { requestId?: string }
   ): Promise<ProvisionSiteResult> {
-    return orchestrateProvision({
+    return executeCreateSiteFromProvision({
       siteName: body.site_name,
       domain: body.domain,
       apiUsername: body.api_username,
       requestId: opts?.requestId,
       erpBaseDomain: this.erpBaseDomain,
       apiUsernamePrefix: this.apiUsernamePrefix,
-      postLifecycle: (action, payload, requestId) => this.postLifecycle(action, payload, requestId),
+      postCreateSite: (createBody, requestId) => this.postCreateSite(createBody, requestId),
     });
   }
 
-  private async postLifecycle(
-    action: string,
-    payload: Record<string, unknown>,
+  private async postCreateSite(
+    body: { siteName: string; domain: string; apiUsername: string },
     requestId?: string
-  ): Promise<LifecyclePostResult> {
-    const url = new URL("/v1/erp/lifecycle", this.baseUrl).toString();
+  ): Promise<ProvisionSiteResult> {
+    console.log("CREATE SITE PAYLOAD:", body);
+    const result = await this.postExecutionEnvelope("/sites/create", body, requestId);
+    if (!result.ok) {
+      return result;
+    }
+
+    const dbName = extractDbNameFromMetadata(result.value.metadata);
+    return {
+      ok: true,
+      data: {
+        site_name: body.siteName,
+        steps: [{ action: "createSite", durationMs: result.value.durationMs }],
+        ...(dbName ? { db_name: dbName } : {}),
+      },
+    };
+  }
+
+  private async postExecutionEnvelope(
+    path: string,
+    body: Record<string, unknown>,
+    requestId?: string
+  ): Promise<ExecutionEnvelopeOk | ExecutionEnvelopeErr> {
+    const pathNormalized = path.startsWith("/") ? path : `/${path}`;
+    const url = `${this.baseUrl}${pathNormalized}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-
-    const body: Record<string, unknown> = { action, payload };
-    if (requestId) {
-      body.requestId = requestId;
-    }
 
     try {
       const response = await this.fetchImpl(url, {
         method: "POST",
         headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.token}`,
           ...(requestId ? { "x-request-id": requestId } : {}),
         },
         body: JSON.stringify(body),
