@@ -20,8 +20,10 @@ services:
     expose:
       - "8080"
     networks:
-      - dokploy-network
-      - erp-execution
+      dokploy-network:
+        aliases:
+          - provisioning-agent
+      erp-execution: {}
 
 networks:
   dokploy-network:
