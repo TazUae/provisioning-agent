@@ -72,10 +72,10 @@ export const ReadDbNameRequestSchema = z.object({
 
 export type ReadDbNameRequest = z.infer<typeof ReadDbNameRequestSchema>;
 
-/** Optional fields for forward-compatible pass-through; agent falls back until Control Plane sends full payload. */
+/** Provision: executor expects site, domain, and API user — forwarded as-is to `POST /sites/create`. */
 export const ProvisionRequestSchema = ReadDbNameRequestSchema.extend({
-  domain: z.string().trim().min(1).optional(),
-  api_username: z.string().trim().min(1).optional(),
+  domain: z.string().trim().min(1),
+  api_username: z.string().trim().min(1),
 });
 
 export type ProvisionRequest = z.infer<typeof ProvisionRequestSchema>;

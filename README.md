@@ -8,7 +8,7 @@ Stable provisioning interface between **Control Plane** and **erp-execution-serv
 Control Plane → provisioning-agent → erp-execution-service → ERP / Frappe
 ```
 
-This service authenticates callers, validates minimal inputs, calls the executor over HTTP, and maps responses to a stable JSON contract. **Transitional in-process orchestration** for `/provision` exists until a single ERP Execution API is available; see **`docs/architecture.md`**. The agent does not run bench, Docker, or Frappe.
+This service authenticates callers, validates inputs, forwards **`POST /sites/create`** on **erp-execution-service** with flat JSON (`siteName`, `domain`, `apiUsername`), and maps responses to a stable JSON contract. The agent does not run bench, Docker, or Frappe.
 
 ## Phase 1 endpoints
 
@@ -17,6 +17,7 @@ This service authenticates callers, validates minimal inputs, calls the executor
 | `GET` | `/health` | No |
 | `POST` | `/sites/read-db-name` | `Authorization: Bearer <PROVISIONING_API_TOKEN>` |
 | `POST` | `/provision` | `Authorization: Bearer <PROVISIONING_API_TOKEN>` |
+| `POST` | `/sites/create` | `Authorization: Bearer <PROVISIONING_API_TOKEN>` |
 
 ### Response shape (Control Plane contract)
 
@@ -48,6 +49,30 @@ Typed error codes include: `AUTH_ERROR`, `VALIDATION_ERROR`, `SITE_NOT_FOUND`, `
 
 `site_name` is an opaque non-empty string (max 2048 chars); stricter rules are enforced upstream.
 
+### Request body (`POST /provision` and `POST /sites/create`)
+
+`POST /provision` (snake_case):
+
+```json
+{
+  "site_name": "<string>",
+  "domain": "<fqdn>",
+  "api_username": "<string>"
+}
+```
+
+`POST /sites/create` (camelCase, equivalent after validation):
+
+```json
+{
+  "siteName": "<string>",
+  "domain": "<fqdn>",
+  "apiUsername": "<string>"
+}
+```
+
+The agent forwards these fields to the executor as **`POST ${ERP_REMOTE_BASE_URL}/sites/create`** with body `{ "siteName", "domain", "apiUsername" }`.
+
 ## Environment variables
 
 The full key set is listed in **`.env.example`** (placeholders only). In production, set real values in **Dokploy** (see **Deployment**). Do not treat a committed `.env` file as authoritative for production.
@@ -57,7 +82,7 @@ The full key set is listed in **`.env.example`** (placeholders only). In product
 | Variable | Purpose |
 |----------|---------|
 | `PROVISIONING_API_TOKEN` | Bearer token Control Plane uses (minimum 16 characters). |
-| `ERP_REMOTE_BASE_URL` | Base URL of **erp-execution-service** (e.g. `http://erp-execution-service:8081`). |
+| `ERP_REMOTE_BASE_URL` | Base URL of **erp-execution-service** (e.g. `http://erp-execution-service:8790`). |
 | `ERP_REMOTE_TOKEN` | Bearer token provisioning-agent uses to call the executor. |
 
 ### Optional (defaults in `src/config/env.ts`)
@@ -67,10 +92,8 @@ The full key set is listed in **`.env.example`** (placeholders only). In product
 | `PORT` | `8080` | Listen port. |
 | `NODE_ENV` | `development` | `development` \| `test` \| `production`. |
 | `ERP_REMOTE_TIMEOUT_MS` | `15000` | HTTP timeout for executor calls. |
-| `ERP_BASE_DOMAIN` | `erp.zaidan-group.com` | Site derivation for provisioning (transitional; see `docs/architecture.md`). |
-| `ERP_API_USERNAME_PREFIX` | `cp` | Prefix for API usernames (transitional). |
 
-Phase 1 HTTP routes use only the **erp-execution-service** client (`ERP_REMOTE_*`).
+Phase 1 HTTP routes use only the **erp-execution-service** client (`ERP_REMOTE_*`). Site creation is delegated with `POST ${ERP_REMOTE_BASE_URL}/sites/create` (flat JSON: `siteName`, `domain`, `apiUsername`).
 
 ## Local development
 
@@ -136,6 +159,6 @@ curl -sS -X POST "http://127.0.0.1:8080/sites/read-db-name" \
 
 ## Further reading
 
-- Transitional architecture and migration: `docs/architecture.md`
-- Executor HTTP contract (lifecycle): `docs/erp-execution-backend.md`
-- `POST /v1/erp/lifecycle` payload: `src/providers/erpnext/remote-contract.ts`
+- Architecture: `docs/architecture.md`
+- Executor integration notes: `docs/erp-execution-backend.md`
+- Upstream response envelope parsing: `src/providers/erpnext/remote-contract.ts`

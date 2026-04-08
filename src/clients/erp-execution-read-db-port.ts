@@ -17,8 +17,8 @@ export type ProvisionSiteResult =
 
 export type ProvisionSiteRequestBody = {
   site_name: string;
-  domain?: string;
-  api_username?: string;
+  domain: string;
+  api_username: string;
 };
 
 /** Minimal dependency for ERP execution HTTP routes (test doubles implement this). */

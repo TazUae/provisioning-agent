@@ -127,7 +127,11 @@ test("POST /provision returns success contract", async () => {
       authorization: `Bearer ${process.env.PROVISIONING_API_TOKEN}`,
       "content-type": "application/json",
     },
-    payload: JSON.stringify({ site_name: "acme" }),
+    payload: JSON.stringify({
+      site_name: "acme",
+      domain: "acme.example.com",
+      api_username: "cp_acme",
+    }),
   });
   assert.equal(res.statusCode, 200);
   const body = JSON.parse(res.body) as {
@@ -198,7 +202,11 @@ test("POST /provision without Bearer returns AUTH_ERROR", async () => {
     method: "POST",
     url: "/provision",
     headers: { "content-type": "application/json" },
-    payload: JSON.stringify({ site_name: "acme" }),
+    payload: JSON.stringify({
+      site_name: "acme",
+      domain: "acme.example.com",
+      api_username: "cp_acme",
+    }),
   });
   assert.equal(res.statusCode, 401);
   const body = JSON.parse(res.body) as { success: boolean; error: { code: string } };

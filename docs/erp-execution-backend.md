@@ -1,58 +1,14 @@
-# ERP execution backend
+# ERP execution integration
 
 ## Current state
 
-`provisioning-agent` executes ERP lifecycle actions through the typed `ErpExecutionBackend` interface:
+`provisioning-agent` talks to **erp-execution-service** over HTTP using **`ERP_REMOTE_BASE_URL`**, **`ERP_REMOTE_TOKEN`**, and **`ERP_REMOTE_TIMEOUT_MS`**.
 
-- `createSite`
-- `installErp`
-- `enableScheduler`
-- `addDomain`
-- `createApiUser`
-- `healthCheck`
+- **Site provisioning:** `POST ${ERP_REMOTE_BASE_URL}/sites/create` with `Content-Type: application/json` and `Authorization: Bearer <ERP_REMOTE_TOKEN>`. Request body is flat: `{ "siteName", "domain", "apiUsername" }`.
+- **Read DB name (if supported by the executor):** `POST ${ERP_REMOTE_BASE_URL}/sites/read-db-name` with flat `{ "siteName" }` (see `ErpExecutionServiceClient.readDbName`).
 
-Backend selection is controlled by `ERP_EXECUTION_BACKEND` (see `src/config/env.ts`):
-
-- **`remote`** — **production** target: `RemoteErpBackend` calls the ERP-side **`erp-execution-service`** (`POST /v1/erp/lifecycle`, typed contract in `remote-contract.ts`). Set **`ERP_REMOTE_BASE_URL`**, **`ERP_REMOTE_TOKEN`**, and **`ERP_REMOTE_TIMEOUT_MS`**. The Phase 1 HTTP gateway (`ErpExecutionServiceClient`) uses the same lifecycle endpoint for `readSiteDbName`. In `NODE_ENV=production`, if `ERP_EXECUTION_BACKEND` is unset, the backend defaults to **`remote`**.
-- **`docker`** — dev/test bridge: `DockerExecBackend` — **temporary** compatibility only; needs Docker CLI on the host. In `development`/`test`, if unset, defaults to **`docker`**.
-
-## Important constraints
-
-- `DockerExecBackend` is a **temporary bridge backend**, not the final production architecture.
-- No arbitrary shell execution.
-- No `bash -c`.
-- No user-controlled command interpolation.
-- No generic bench passthrough.
-- No generic Docker control exposed upstream.
-
-All commands are argv-based (`spawn(..., { shell: false })`) with strict timeout and error mapping.
+The Phase 1 gateway is `ErpExecutionServiceClient` in `src/clients/erp-execution-service-client.ts`. Success and failure responses are parsed using the envelope types in `src/providers/erpnext/remote-contract.ts`.
 
 ## Error model
 
-Execution failures are mapped to structured safe codes:
-
-- `INFRA_UNAVAILABLE`
-- `ERP_COMMAND_FAILED`
-- `ERP_TIMEOUT`
-- `ERP_VALIDATION_FAILED`
-- `ERP_PARTIAL_SUCCESS`
-- `SITE_ALREADY_EXISTS`
-- `SITE_NOT_FOUND`
-
-Upper/public layers receive only safe fields:
-
-- `code`
-- `message`
-- `retryable`
-- optional non-sensitive `details`
-
-Raw command stdout/stderr stay internal.
-
-## Migration path: docker -> remote
-
-1. Keep current Control Plane orchestration and route contract unchanged.
-2. Keep queue/worker/state-machine flow unchanged.
-3. Deploy **`erp-execution-service`** on the ERP side (see [`docs/erp-side-execution-service.md`](../../docs/erp-side-execution-service.md)).
-4. `RemoteErpBackend` in this repo already targets that contract; set `ERP_REMOTE_BASE_URL` / `ERP_REMOTE_TOKEN` / `ERP_REMOTE_TIMEOUT_MS`.
-5. Set `ERP_EXECUTION_BACKEND=remote` in production (or rely on production default `remote` when unset); non-production defaults to `docker` when unset.
-6. Remove `DockerExecBackend` only after successful rollout and validation.
+Executor failures use a structured envelope; the agent maps them to public `PublicErrorCode` values for Control Plane. Raw upstream details are not exposed beyond safe fields.

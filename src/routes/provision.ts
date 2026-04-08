@@ -11,8 +11,8 @@ import { sendPublicError, sendPublicSuccessProvision } from "../lib/public-api-r
 
 const SitesCreateCompatSchema = z.object({
   siteName: z.string().trim().min(1).max(2048),
-  domain: z.string().trim().min(1).optional(),
-  apiUsername: z.string().trim().min(1).optional(),
+  domain: z.string().trim().min(1),
+  apiUsername: z.string().trim().min(1),
 });
 
 async function runProvisionRequest(
@@ -113,8 +113,8 @@ export async function registerProvisionRoute(
 
       const provisionCandidate = {
         site_name: parsed.data.siteName,
-        ...(parsed.data.domain !== undefined ? { domain: parsed.data.domain } : {}),
-        ...(parsed.data.apiUsername !== undefined ? { api_username: parsed.data.apiUsername } : {}),
+        domain: parsed.data.domain,
+        api_username: parsed.data.apiUsername,
       };
 
       const provisionParsed = ProvisionRequestSchema.safeParse(provisionCandidate);

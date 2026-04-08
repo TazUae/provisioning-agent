@@ -163,10 +163,12 @@ test("provisionSite POSTs flat JSON once to /sites/create and aggregates one ste
   const client = new ErpExecutionServiceClient({
     ...baseConfig,
     fetchImpl: fetchMock,
-    erpBaseDomain: "example.test",
-    apiUsernamePrefix: "cp",
   });
-  const result = await client.provisionSite({ site_name: "acme" });
+  const result = await client.provisionSite({
+    site_name: "acme",
+    domain: "acme.example.test",
+    api_username: "cp_acme",
+  });
   assert.equal(calls, 1);
   assert.equal(result.ok, true);
   if (result.ok) {
@@ -189,10 +191,12 @@ test("provisionSite includes db_name from metadata when legacy dbName is used", 
   const client = new ErpExecutionServiceClient({
     ...baseConfig,
     fetchImpl: fetchMock,
-    erpBaseDomain: "example.test",
-    apiUsernamePrefix: "cp",
   });
-  const result = await client.provisionSite({ site_name: "legacy" });
+  const result = await client.provisionSite({
+    site_name: "legacy",
+    domain: "legacy.example.test",
+    api_username: "cp_legacy",
+  });
   assert.equal(result.ok, true);
   if (result.ok) {
     assert.equal(result.data.db_name, "_legacy_db");

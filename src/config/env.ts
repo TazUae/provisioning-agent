@@ -8,8 +8,6 @@ const EnvSchema = z.object({
   ERP_REMOTE_BASE_URL: z.string().trim().url(),
   ERP_REMOTE_TOKEN: z.string().trim().min(1),
   ERP_REMOTE_TIMEOUT_MS: z.coerce.number().int().min(1).max(300_000).default(15000),
-  ERP_BASE_DOMAIN: z.string().min(1).default("erp.zaidan-group.com"),
-  ERP_API_USERNAME_PREFIX: z.string().min(1).default("cp"),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

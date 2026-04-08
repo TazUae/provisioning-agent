@@ -10,17 +10,17 @@ import {
   type RemoteExecutionEnvelope,
 } from "../providers/erpnext/remote-contract.js";
 import { extractDbNameFromMetadata } from "../lib/erp-metadata-db-name.js";
-import { executeCreateSiteFromProvision } from "../modules/provisioning/orchestrator.js";
-import { normalizeOpaqueSiteString } from "../providers/erpnext/validation.js";
+import {
+  normalizeOpaqueSiteString,
+  validateDomain,
+  validateUsername,
+} from "../providers/erpnext/validation.js";
 
 export type ErpExecutionServiceClientConfig = {
   baseUrl: string;
   token: string;
   timeoutMs: number;
   fetchImpl?: typeof fetch;
-  /** Defaults match `ERP_BASE_DOMAIN` / `ERP_API_USERNAME_PREFIX` in `env.ts`. */
-  erpBaseDomain?: string;
-  apiUsernamePrefix?: string;
 };
 
 export type { ReadDbNameResult } from "./erp-execution-read-db-port.js";
@@ -91,23 +91,20 @@ type ExecutionEnvelopeErr = {
 };
 
 /**
- * HTTP client for erp-execution-service (`POST /sites/create`, `POST /sites/read-db-name`).
+ * HTTP client for erp-execution-service.
+ * Site creation: `POST ${ERP_REMOTE_BASE_URL}/sites/create` (e.g. `http://erp-execution-service:8790/sites/create`).
  */
 export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
   private readonly baseUrl: string;
   private readonly token: string;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
-  private readonly erpBaseDomain: string;
-  private readonly apiUsernamePrefix: string;
 
   constructor(config: ErpExecutionServiceClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.token = config.token;
     this.timeoutMs = config.timeoutMs;
     this.fetchImpl = config.fetchImpl ?? fetch;
-    this.erpBaseDomain = config.erpBaseDomain ?? "erp.zaidan-group.com";
-    this.apiUsernamePrefix = config.apiUsernamePrefix ?? "cp";
   }
 
   async readDbName(siteName: string): Promise<ReadDbNameResult> {
@@ -121,7 +118,7 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
     const body = { siteName: site };
     const result = await this.postExecutionEnvelope("/sites/read-db-name", body);
     if (!result.ok) {
-      return result;
+      return { ok: false, code: result.code, message: result.message };
     }
 
     const dbName = extractDbNameFromMetadata(result.value.metadata);
@@ -145,23 +142,29 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
     body: ProvisionSiteRequestBody,
     opts?: { requestId?: string }
   ): Promise<ProvisionSiteResult> {
-    return executeCreateSiteFromProvision({
-      siteName: body.site_name,
-      domain: body.domain,
-      apiUsername: body.api_username,
-      requestId: opts?.requestId,
-      erpBaseDomain: this.erpBaseDomain,
-      apiUsernamePrefix: this.apiUsernamePrefix,
-      postCreateSite: (createBody, requestId) => this.postCreateSite(createBody, requestId),
-    });
-  }
+    let siteName: string;
+    let domain: string;
+    let apiUsername: string;
+    try {
+      siteName = normalizeOpaqueSiteString(body.site_name);
+      domain = validateDomain(body.domain.trim());
+      apiUsername = validateUsername(body.api_username.trim());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        ok: false,
+        code: "VALIDATION_ERROR",
+        message: message || "Invalid provision input",
+      };
+    }
 
-  private async postCreateSite(
-    body: { siteName: string; domain: string; apiUsername: string },
-    requestId?: string
-  ): Promise<ProvisionSiteResult> {
-    console.log("CREATE SITE PAYLOAD:", body);
-    const result = await this.postExecutionEnvelope("/sites/create", body, requestId);
+    console.log("CREATE SITE PAYLOAD:", { siteName, domain, apiUsername });
+
+    const result = await this.postExecutionEnvelope(
+      "/sites/create",
+      { siteName, domain, apiUsername },
+      opts?.requestId
+    );
     if (!result.ok) {
       return result;
     }
@@ -170,7 +173,7 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
     return {
       ok: true,
       data: {
-        site_name: body.siteName,
+        site_name: siteName,
         steps: [{ action: "createSite", durationMs: result.value.durationMs }],
         ...(dbName ? { db_name: dbName } : {}),
       },

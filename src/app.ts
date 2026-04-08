@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import crypto from "node:crypto";
 import type { ErpExecutionReadDbPort } from "./clients/erp-execution-read-db-port.js";
 import { ErpExecutionServiceClient } from "./clients/erp-execution-service-client.js";
-import { env, getErpExecutionConnection } from "./config/env.js";
+import { getErpExecutionConnection } from "./config/env.js";
 import { logger, loggerConfig } from "./lib/logger.js";
 import { sendPublicError } from "./lib/public-api-response.js";
 import { registerHealthRoutes } from "./routes/health.js";
@@ -19,8 +19,6 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     options.erpExecutionClient ??
     new ErpExecutionServiceClient({
       ...getErpExecutionConnection(),
-      erpBaseDomain: env.ERP_BASE_DOMAIN,
-      apiUsernamePrefix: env.ERP_API_USERNAME_PREFIX,
     });
 
   const app = Fastify({

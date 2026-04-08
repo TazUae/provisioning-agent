@@ -52,8 +52,6 @@ Set these in an **`EnvironmentFile`** (e.g. `/etc/provisioning-agent/environment
 | `ERP_EXECUTION_BACKEND` | **`docker`** for current supported strategic path (default); `remote` is scaffold-only and currently returns not-implemented |
 | `ERP_BENCH_PATH` | Absolute path to real bench on **this** host |
 | `ERP_BENCH_EXECUTABLE` | `bench` or absolute path |
-| `ERP_BASE_DOMAIN` | As today |
-| `ERP_API_USERNAME_PREFIX` | As today |
 | `ERP_COMMAND_TIMEOUT_MS` | As today (e.g. `120000`) |
 | `ERP_CONTAINER_NAME` | Required for `docker` backend |
 
