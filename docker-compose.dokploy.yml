@@ -5,8 +5,13 @@ services:
     build: .
     init: true
     restart: unless-stopped
-    labels:
-      - "traefik.enable=false"
+    deploy:
+      replicas: 1
+      labels: []
+      placement: {}
+      restart_policy:
+        condition: any
+      endpoint_mode: vip
     # Production values come from Dokploy (or the host env at deploy time), not from a repo .env file.
     environment:
       NODE_ENV: ${NODE_ENV}
@@ -20,10 +25,8 @@ services:
     expose:
       - "8080"
     networks:
-      dokploy-network:
-        aliases:
-          - provisioning-agent
-      erp-execution: {}
+      - dokploy-network
+      - erp-execution
 
 networks:
   dokploy-network:
