@@ -141,6 +141,49 @@ test("POST /provision returns success contract", async () => {
   await app.close();
 });
 
+test("POST /sites/create maps camelCase to provision contract and returns success", async () => {
+  const mock: ErpExecutionReadDbPort = {
+    readDbName: async () => ({ ok: true, dbName: "x" }),
+    provisionSite: async (body) => {
+      assert.equal(body.site_name, "acme");
+      assert.equal(body.domain, "acme.example.com");
+      assert.equal(body.api_username, "cp_acme");
+      return {
+        ok: true,
+        data: {
+          site_name: "acme",
+          steps: [{ action: "createSite", durationMs: 10 }],
+          db_name: "_tenant_acme",
+        },
+      };
+    },
+  };
+  const { buildApp } = await import("../app.js");
+  const app = await buildApp({ erpExecutionClient: mock });
+  const res = await app.inject({
+    method: "POST",
+    url: "/sites/create",
+    headers: {
+      authorization: `Bearer ${process.env.PROVISIONING_API_TOKEN}`,
+      "content-type": "application/json",
+    },
+    payload: JSON.stringify({
+      siteName: "acme",
+      domain: "acme.example.com",
+      apiUsername: "cp_acme",
+    }),
+  });
+  assert.equal(res.statusCode, 200);
+  const body = JSON.parse(res.body) as {
+    success: boolean;
+    data: { site_name: string; db_name?: string };
+  };
+  assert.equal(body.success, true);
+  assert.equal(body.data.site_name, "acme");
+  assert.equal(body.data.db_name, "_tenant_acme");
+  await app.close();
+});
+
 test("POST /provision without Bearer returns AUTH_ERROR", async () => {
   const mock: ErpExecutionReadDbPort = {
     readDbName: async () => ({ ok: true, dbName: "x" }),
