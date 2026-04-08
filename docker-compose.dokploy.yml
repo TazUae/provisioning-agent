@@ -5,10 +5,12 @@ services:
     build: .
     init: true
     restart: unless-stopped
+    labels:
+      - "traefik.enable=false"
     # Production values come from Dokploy (or the host env at deploy time), not from a repo .env file.
     environment:
       NODE_ENV: ${NODE_ENV}
-      PORT: ${PORT}
+      PORT: "8080"
       PROVISIONING_API_TOKEN: ${PROVISIONING_API_TOKEN}
       ERP_REMOTE_BASE_URL: ${ERP_REMOTE_BASE_URL}
       ERP_REMOTE_TOKEN: ${ERP_REMOTE_TOKEN}
@@ -16,12 +18,10 @@ services:
       ERP_BASE_DOMAIN: ${ERP_BASE_DOMAIN}
       ERP_API_USERNAME_PREFIX: ${ERP_API_USERNAME_PREFIX}
     expose:
-      - "${PORT}"
+      - "8080"
     networks:
-      dokploy-network:
-        aliases:
-          - provisioning-agent
-      erp-execution: {}
+      - dokploy-network
+      - erp-execution
 
 networks:
   dokploy-network:
