@@ -13,7 +13,7 @@ export type ProvisionSiteSuccessData = {
 
 export type ProvisionSiteResult =
   | { ok: true; data: ProvisionSiteSuccessData }
-  | { ok: false; code: PublicErrorCode; message: string };
+  | { ok: false; code: PublicErrorCode; message: string; details?: unknown };
 
 export type ProvisionSiteRequestBody = {
   site_name: string;

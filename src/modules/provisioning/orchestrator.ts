@@ -18,7 +18,7 @@ function resolveDerivedDomainForProvision(safeSite: string, erpBaseDomain: strin
 
 export type LifecyclePostResult =
   | { ok: true; value: { durationMs: number; metadata?: Record<string, string | number | boolean> } }
-  | { ok: false; code: PublicErrorCode; message: string };
+  | { ok: false; code: PublicErrorCode; message: string; details?: unknown };
 
 export type OrchestrateProvisionInput = {
   siteName: string;

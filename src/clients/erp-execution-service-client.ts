@@ -75,9 +75,9 @@ function mapUpstreamFailure(
       return { code: "UPSTREAM_TIMEOUT", message };
     default:
       if (responseStatus >= 400 && responseStatus < 500) {
-        return { code: "UPSTREAM_HTTP_ERROR", message: safeUpstreamMessage };
+        return { code: "UPSTREAM_HTTP_ERROR", message: message || safeUpstreamMessage };
       }
-      return { code: "UPSTREAM_HTTP_ERROR", message: safeUpstreamMessage };
+      return { code: "UPSTREAM_HTTP_ERROR", message: message || safeUpstreamMessage };
   }
 }
 
@@ -243,6 +243,7 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
         return {
           ok: false,
           ...mapUpstreamFailure(envelope, response.status),
+          details: envelope.error,
         };
       }
 
