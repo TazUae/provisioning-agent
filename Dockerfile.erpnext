@@ -1,0 +1,16 @@
+# ERPNext image with provisioning_api: pip editable install + apps.txt registry.
+# Site install is done at deploy time (bench --site … install-app), not baked for all sites here.
+ARG ERP_VERSION=version-15
+FROM frappe/erpnext:${ERP_VERSION}
+
+USER root
+
+COPY --chown=frappe:frappe provisioning_api /home/frappe/frappe-bench/apps/provisioning_api
+
+RUN /home/frappe/frappe-bench/env/bin/pip install -e /home/frappe/frappe-bench/apps/provisioning_api
+
+RUN echo "provisioning_api" >> /home/frappe/frappe-bench/sites/apps.txt
+
+RUN chown -R frappe:frappe /home/frappe/frappe-bench/apps/provisioning_api
+
+USER frappe

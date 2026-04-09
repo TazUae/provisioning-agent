@@ -1,0 +1,7 @@
+app_name = "provisioning_api"
+app_title = "Provisioning API"
+app_publisher = "Internal"
+app_description = "Provisioning API"
+app_version = "0.0.1"
+app_email = ""
+app_license = "MIT"
