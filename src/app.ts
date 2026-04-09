@@ -4,6 +4,7 @@ import type { ErpExecutionReadDbPort } from "./clients/erp-execution-read-db-por
 import { ErpExecutionServiceClient } from "./clients/erp-execution-service-client.js";
 import { getErpExecutionConnection } from "./config/env.js";
 import { logger, loggerConfig } from "./lib/logger.js";
+import { isExecutionServiceFailure } from "./clients/erp-execution-service-client.js";
 import { sendPublicError } from "./lib/public-api-response.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerProvisionRoute } from "./routes/provision.js";
@@ -28,6 +29,20 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   });
 
   app.setErrorHandler((error, _req, reply) => {
+    if (isExecutionServiceFailure(error)) {
+      logger.error(
+        { message: error.message, step: error.step, raw: error.raw ?? null },
+        "Execution service failure"
+      );
+      void reply.code(500).send({
+        success: false,
+        status: error.status,
+        step: error.step,
+        error: error.message,
+        details: error.raw ?? null,
+      });
+      return;
+    }
     logger.error({ error }, "Unhandled error");
     sendPublicError(
       reply,

@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ErpExecutionServiceClient } from "./erp-execution-service-client.js";
+import {
+  ErpExecutionServiceClient,
+  type PostSitesCreateImpl,
+} from "./erp-execution-service-client.js";
 
 const baseConfig = {
   baseUrl: "http://127.0.0.1:18080",
@@ -139,30 +142,27 @@ test("readDbName maps invalid JSON body to INVALID_UPSTREAM_RESPONSE", async () 
 
 test("provisionSite POSTs flat JSON once to /sites/create and aggregates one step", async () => {
   let calls = 0;
-  const fetchMock: typeof fetch = async (input, init) => {
+  const postSitesCreateImpl: PostSitesCreateImpl = async (url, payload, opts) => {
     calls += 1;
-    assert.match(String(input), /\/sites\/create$/);
-    const posted = init?.body ? JSON.parse(String(init.body)) : {};
-    assert.equal("payload" in posted, false);
-    assert.deepEqual(posted, {
+    assert.match(url, /\/sites\/create$/);
+    assert.equal("payload" in payload, false);
+    assert.deepEqual(payload, {
       siteName: "acme",
       domain: "acme.example.test",
       apiUsername: "cp_acme",
     });
-    const hdrs = new Headers(init?.headers as HeadersInit);
-    assert.equal(hdrs.get("content-type"), "application/json");
-    assert.ok(hdrs.get("authorization")?.startsWith("Bearer "));
-    return new Response(
-      JSON.stringify({
+    assert.equal(opts.headers["Content-Type"], "application/json");
+    assert.ok(opts.headers.Authorization?.startsWith("Bearer "));
+    return {
+      data: {
         ok: true,
         data: { durationMs: 100, metadata: { db_name: "_acme_db" } },
-      }),
-      { status: 200, headers: { "content-type": "application/json" } }
-    );
+      },
+    };
   };
   const client = new ErpExecutionServiceClient({
     ...baseConfig,
-    fetchImpl: fetchMock,
+    postSitesCreateImpl,
   });
   const result = await client.provisionSite({
     site_name: "acme",
@@ -180,17 +180,15 @@ test("provisionSite POSTs flat JSON once to /sites/create and aggregates one ste
 });
 
 test("provisionSite includes db_name from metadata when legacy dbName is used", async () => {
-  const fetchMock: typeof fetch = async () =>
-    new Response(
-      JSON.stringify({
-        ok: true,
-        data: { durationMs: 10, metadata: { dbName: "_legacy_db" } },
-      }),
-      { status: 200, headers: { "content-type": "application/json" } }
-    );
+  const postSitesCreateImpl: PostSitesCreateImpl = async () => ({
+    data: {
+      ok: true,
+      data: { durationMs: 10, metadata: { dbName: "_legacy_db" } },
+    },
+  });
   const client = new ErpExecutionServiceClient({
     ...baseConfig,
-    fetchImpl: fetchMock,
+    postSitesCreateImpl,
   });
   const result = await client.provisionSite({
     site_name: "legacy",

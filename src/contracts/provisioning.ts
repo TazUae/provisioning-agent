@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const ProvisioningErrorCodeSchema = z.enum([
-  "INFRA_UNAVAILABLE",
   "ERP_COMMAND_FAILED",
   "ERP_VALIDATION_FAILED",
   "ERP_TIMEOUT",

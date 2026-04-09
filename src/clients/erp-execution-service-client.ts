@@ -1,3 +1,5 @@
+import axios from "axios";
+import { z } from "zod";
 import type {
   ErpExecutionReadDbPort,
   ProvisionSiteRequestBody,
@@ -21,11 +23,42 @@ export type ErpExecutionServiceClientConfig = {
   token: string;
   timeoutMs: number;
   fetchImpl?: typeof fetch;
+  /** @internal For tests: override POST /sites/create. Defaults to axios.post. */
+  postSitesCreateImpl?: PostSitesCreateImpl;
 };
+
+export type PostSitesCreateImpl = (
+  url: string,
+  payload: Record<string, unknown>,
+  options: { timeout: number; headers: Record<string, string> }
+) => Promise<{ data: unknown }>;
+
+export type ExecutionServiceFailure = {
+  status: "failure";
+  step: string;
+  message: string;
+  raw?: unknown;
+};
+
+export function isExecutionServiceFailure(err: unknown): err is ExecutionServiceFailure {
+  if (typeof err !== "object" || err === null) {
+    return false;
+  }
+  const o = err as Record<string, unknown>;
+  return (
+    o.status === "failure" &&
+    typeof o.step === "string" &&
+    typeof o.message === "string"
+  );
+}
 
 export type { ReadDbNameResult } from "./erp-execution-read-db-port.js";
 
 const safeUpstreamMessage = "The ERP execution service returned an error";
+
+const slugSchema = z.object({
+  slug: z.string().min(3),
+});
 
 function isAbortError(error: unknown): boolean {
   if (error instanceof Error && error.name === "AbortError") {
@@ -78,6 +111,33 @@ function mapUpstreamFailure(
   }
 }
 
+/** stderr / message from execution service error payloads (HTTP or envelope). */
+export function extractExecFailureMessage(execError: unknown): string {
+  if (execError == null || typeof execError !== "object") {
+    return "Unknown ERP error";
+  }
+  const root = execError as Record<string, unknown>;
+  const err = root.error;
+  if (err && typeof err === "object") {
+    const er = err as Record<string, unknown>;
+    const details = er.details;
+    if (typeof details === "string") {
+      return details;
+    }
+    if (details && typeof details === "object") {
+      const stderr = (details as Record<string, unknown>).stderr;
+      if (typeof stderr === "string") {
+        return stderr;
+      }
+    }
+    const msg = er.message;
+    if (typeof msg === "string" && msg.length > 0) {
+      return msg;
+    }
+  }
+  return "Unknown ERP error";
+}
+
 type ExecutionEnvelopeOk = {
   ok: true;
   value: { durationMs: number; metadata?: Record<string, string | number | boolean> };
@@ -99,12 +159,16 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
   private readonly token: string;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
+  private readonly postSitesCreateImpl: PostSitesCreateImpl;
 
   constructor(config: ErpExecutionServiceClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.token = config.token;
     this.timeoutMs = config.timeoutMs;
     this.fetchImpl = config.fetchImpl ?? fetch;
+    this.postSitesCreateImpl =
+      config.postSitesCreateImpl ??
+      ((url, payload, options) => axios.post(url, payload, options));
   }
 
   async readDbName(siteName: string): Promise<ReadDbNameResult> {
@@ -158,23 +222,94 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
       };
     }
 
-    console.log("CREATE SITE PAYLOAD:", { siteName, domain, apiUsername });
-
-    const result = await this.postExecutionEnvelope(
-      "/sites/create",
-      { siteName, domain, apiUsername },
-      opts?.requestId
-    );
-    if (!result.ok) {
-      return result;
+    try {
+      slugSchema.parse({ slug: siteName });
+    } catch (error) {
+      const message =
+        error instanceof z.ZodError ? error.issues[0]?.message ?? "Invalid slug" : String(error);
+      return {
+        ok: false,
+        code: "VALIDATION_ERROR",
+        message: message || "Invalid provision input",
+      };
     }
 
-    const dbName = extractDbNameFromMetadata(result.value.metadata);
+    const payload = { siteName, domain, apiUsername };
+    const url = `${this.baseUrl}/sites/create`;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${this.token}`,
+      ...(opts?.requestId ? { "x-request-id": opts.requestId } : {}),
+    };
+
+    let data: unknown;
+    try {
+      console.log("➡️ CALLING EXECUTION SERVICE", { url, payload });
+
+      const response = await this.postSitesCreateImpl(url, payload, {
+        timeout: this.timeoutMs,
+        headers,
+      });
+
+      console.log("⬅️ EXECUTION RESPONSE:", response.data);
+
+      data = response.data;
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: unknown }; message?: string };
+      if (err.response) {
+        const execError = err.response.data;
+        console.error("❌ EXECUTION ERROR:", JSON.stringify(execError, null, 2));
+        throw {
+          status: "failure",
+          step: "site_created",
+          message: extractExecFailureMessage(execError),
+          raw: execError,
+        } satisfies ExecutionServiceFailure;
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("❌ NETWORK ERROR:", msg);
+      throw {
+        status: "failure",
+        step: "site_created",
+        message: `Execution service unreachable: ${msg}`,
+      } satisfies ExecutionServiceFailure;
+    }
+
+    if (data !== null && typeof data === "object" && "ok" in data && (data as { ok: unknown }).ok === false) {
+      const execError = data;
+      console.error("❌ EXECUTION ERROR:", JSON.stringify(execError, null, 2));
+      throw {
+        status: "failure",
+        step: "site_created",
+        message: extractExecFailureMessage(execError),
+        raw: execError,
+      } satisfies ExecutionServiceFailure;
+    }
+
+    const envelopeParsed = RemoteExecutionEnvelopeSchema.safeParse(data);
+    if (!envelopeParsed.success) {
+      return {
+        ok: false,
+        code: "INVALID_UPSTREAM_RESPONSE",
+        message: "Upstream response did not match the expected contract",
+      };
+    }
+
+    const envelope = envelopeParsed.data;
+    if (!envelope.ok) {
+      return {
+        ok: false,
+        ...mapUpstreamFailure(envelope, 200),
+        details: envelope.error,
+      };
+    }
+
+    const dbName = extractDbNameFromMetadata(envelope.data.metadata);
     return {
       ok: true,
       data: {
         site_name: siteName,
-        steps: [{ action: "createSite", durationMs: result.value.durationMs }],
+        steps: [{ action: "createSite", durationMs: envelope.data.durationMs }],
         ...(dbName ? { db_name: dbName } : {}),
       },
     };

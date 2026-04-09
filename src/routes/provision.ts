@@ -5,6 +5,7 @@ import {
   ProvisionRequestSchema,
   type ProvisionRequest,
 } from "../contracts/control-plane-api.js";
+import { isExecutionServiceFailure } from "../clients/erp-execution-service-client.js";
 import { requireBearerToken } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { sendPublicError, sendPublicSuccessProvision } from "../lib/public-api-response.js";
@@ -52,6 +53,23 @@ async function runProvisionRequest(
 
     sendPublicSuccessProvision(reply, result.data);
   } catch (error) {
+    if (isExecutionServiceFailure(error)) {
+      logger.error(
+        {
+          message: error.message,
+          step: error.step,
+          raw: error.raw ?? null,
+        },
+        "ERP create site FAILED"
+      );
+      return reply.code(500).send({
+        success: false,
+        status: error.status,
+        step: error.step,
+        error: error.message,
+        details: error.raw ?? null,
+      });
+    }
     const err = error instanceof Error ? error : new Error(String(error));
     logger.error(
       {

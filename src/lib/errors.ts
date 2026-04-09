@@ -27,7 +27,7 @@ export class AgentError extends Error {
     this.name = "AgentError";
     this.code = code;
     this.details = options.details;
-    this.retryable = options.retryable ?? (code === "INFRA_UNAVAILABLE" || code === "ERP_TIMEOUT");
+    this.retryable = options.retryable ?? code === "ERP_TIMEOUT";
     this.stdout = options.stdout;
     this.stderr = options.stderr;
     this.exitCode = options.exitCode;
