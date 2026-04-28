@@ -156,7 +156,12 @@ function failureEnvelope(
 test("POST /sites/install-erp requires Bearer token", async () => {
   const { forwarder } = fakeForwarder(successEnvelope({ action: "installErp" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -173,7 +178,12 @@ test("POST /sites/install-erp requires Bearer token", async () => {
 test("POST /sites/install-erp rejects wrong bearer token", async () => {
   const { forwarder } = fakeForwarder(successEnvelope({ action: "installErp" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -200,7 +210,12 @@ test("POST /sites/install-erp forwards Phase 2 envelope verbatim", async () => {
   });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -224,7 +239,12 @@ test("POST /sites/install-erp relays upstream failure status and body", async ()
   const upstream = failureEnvelope(503, "INFRA_UNAVAILABLE", "bench-agent unreachable", true);
   const { forwarder } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -242,7 +262,12 @@ test("POST /sites/install-erp relays upstream failure status and body", async ()
 test("POST /sites/install-erp returns 422 when site is missing", async () => {
   const { forwarder, calls } = fakeForwarder(successEnvelope({ action: "installErp" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -266,7 +291,12 @@ test("POST /sites/install-erp returns 422 when site is missing", async () => {
 test("POST /sites/install-fitdesk requires Bearer token", async () => {
   const { forwarder } = fakeForwarder(successEnvelope({ action: "installFitdesk" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -288,7 +318,12 @@ test("POST /sites/install-fitdesk forwards Phase 2 envelope verbatim", async () 
   });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -312,7 +347,12 @@ test("POST /sites/install-fitdesk relays upstream failure status and body", asyn
   const upstream = failureEnvelope(503, "INFRA_UNAVAILABLE", "bench-agent unreachable", true);
   const { forwarder } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -330,7 +370,12 @@ test("POST /sites/install-fitdesk relays upstream failure status and body", asyn
 test("POST /sites/install-fitdesk returns 422 when site is missing", async () => {
   const { forwarder, calls } = fakeForwarder(successEnvelope({ action: "installFitdesk" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -355,7 +400,12 @@ test("POST /sites/enable-scheduler forwards to execution-service", async () => {
   const upstream = successEnvelope({ action: "enableScheduler", site: "acme.example", outcome: "applied" });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -377,7 +427,12 @@ test("POST /sites/add-domain forwards site payload", async () => {
   const upstream = successEnvelope({ action: "addDomain", site: "acme.erp.example.com", outcome: "applied" });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -409,7 +464,12 @@ test("POST /sites/create-api-user forwards and returns credentials envelope verb
   });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -437,7 +497,12 @@ test("GET /sites/:site/status forwards and returns upstream body verbatim", asyn
   });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "GET",
@@ -458,7 +523,12 @@ test("GET /sites/:site/status forwards and returns upstream body verbatim", asyn
 test("GET /sites/:site/status requires auth", async () => {
   const { forwarder, calls } = fakeForwarder(successEnvelope({ action: "siteStatus" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "GET",
@@ -475,7 +545,12 @@ test("GET /sites/:site/status relays upstream 504 timeout body", async () => {
   const upstream = failureEnvelope(504, "ERP_TIMEOUT", "bench timed out", true);
   const { forwarder } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "GET",
@@ -495,7 +570,12 @@ test("POST /sites/create forwards Phase 2 envelope verbatim including adminPassw
   const upstream = successEnvelope({ action: "createSite", site: "acme", outcome: "applied" });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -527,7 +607,12 @@ test("POST /sites/setup-locale forwards locale payload verbatim", async () => {
   const upstream = successEnvelope({ action: "setupLocale", site: "acme", outcome: "applied" });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -560,7 +645,12 @@ test("POST /sites/setup-locale forwards locale payload verbatim", async () => {
 test("POST /sites/setup-locale returns 422 when country is missing", async () => {
   const { forwarder, calls } = fakeForwarder(successEnvelope({ action: "setupLocale" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -584,7 +674,12 @@ test("POST /sites/setup-company forwards company payload verbatim", async () => 
   const upstream = successEnvelope({ action: "setupCompany", site: "acme", outcome: "applied" });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -617,7 +712,12 @@ test("POST /sites/setup-company forwards company payload verbatim", async () => 
 test("POST /sites/setup-company returns 422 when companyName is missing", async () => {
   const { forwarder, calls } = fakeForwarder(successEnvelope({ action: "setupCompany" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -641,7 +741,12 @@ test("POST /sites/setup-fiscal-year forwards fiscal year payload verbatim", asyn
   const upstream = successEnvelope({ action: "setupFiscalYear", site: "acme", outcome: "applied" });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -671,7 +776,12 @@ test("POST /sites/setup-fiscal-year forwards fiscal year payload verbatim", asyn
 test("POST /sites/setup-fiscal-year returns 422 when companyName is missing", async () => {
   const { forwarder, calls } = fakeForwarder(successEnvelope({ action: "setupFiscalYear" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -695,7 +805,12 @@ test("POST /sites/setup-global-defaults forwards global defaults payload verbati
   const upstream = successEnvelope({ action: "setupGlobalDefaults", site: "acme", outcome: "applied" });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -728,7 +843,12 @@ test("POST /sites/setup-global-defaults forwards global defaults payload verbati
 test("POST /sites/setup-global-defaults returns 422 when fiscalYearName is missing", async () => {
   const { forwarder, calls } = fakeForwarder(successEnvelope({ action: "setupGlobalDefaults" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -752,7 +872,12 @@ test("POST /sites/setup-complete forwards payload verbatim", async () => {
   const upstream = successEnvelope({ action: "setupComplete", site: "acme", outcome: "applied" });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -776,7 +901,12 @@ test("POST /sites/setup-complete forwards payload verbatim", async () => {
 test("POST /sites/setup-complete returns 422 when companyName is missing", async () => {
   const { forwarder, calls } = fakeForwarder(successEnvelope({ action: "setupComplete" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -800,7 +930,12 @@ test("POST /sites/setup-regional forwards regional payload verbatim", async () =
   const upstream = successEnvelope({ action: "setupRegional", site: "acme", outcome: "applied" });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -830,7 +965,12 @@ test("POST /sites/setup-regional forwards regional payload verbatim", async () =
 test("POST /sites/setup-regional returns 422 when companyName is missing", async () => {
   const { forwarder, calls } = fakeForwarder(successEnvelope({ action: "setupRegional" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -854,7 +994,12 @@ test("POST /sites/setup-domains forwards domains payload verbatim", async () => 
   const upstream = successEnvelope({ action: "setupDomains", site: "acme", outcome: "applied" });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -878,7 +1023,12 @@ test("POST /sites/setup-domains forwards domains payload verbatim", async () => 
 test("POST /sites/setup-domains returns 422 when companyName is missing", async () => {
   const { forwarder, calls } = fakeForwarder(successEnvelope({ action: "setupDomains" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -902,7 +1052,12 @@ test("POST /sites/setup-roles forwards site payload verbatim", async () => {
   const upstream = successEnvelope({ action: "setupRoles", site: "acme", outcome: "applied" });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -925,7 +1080,12 @@ test("POST /sites/setup-roles forwards site payload verbatim", async () => {
 test("POST /sites/setup-roles returns 422 when site is missing", async () => {
   const { forwarder, calls } = fakeForwarder(successEnvelope({ action: "setupRoles" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
@@ -946,7 +1106,12 @@ test("POST /sites/setup-roles returns 422 when site is missing", async () => {
 test("POST /sites/create returns 422 when adminPassword is missing", async () => {
   const { forwarder } = fakeForwarder(successEnvelope({ action: "createSite" }));
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
   try {
     const res = await app.inject({
       method: "POST",
