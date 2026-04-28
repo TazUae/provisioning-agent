@@ -2,6 +2,8 @@ import Fastify, { type FastifyInstance } from "fastify";
 import crypto from "node:crypto";
 import type { ErpExecutionReadDbPort } from "./clients/erp-execution-read-db-port.js";
 import { ErpExecutionServiceClient } from "./clients/erp-execution-service-client.js";
+import type { SiteStepsForwarderPort } from "./clients/site-steps-forwarder-port.js";
+import { SiteStepsForwarder } from "./clients/site-steps-forwarder.js";
 import { getErpExecutionConnection } from "./config/env.js";
 import { logger, loggerConfig } from "./lib/logger.js";
 import { isExecutionServiceFailure } from "./clients/erp-execution-service-client.js";
@@ -9,18 +11,29 @@ import { sendPublicError } from "./lib/public-api-response.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerProvisionRoute } from "./routes/provision.js";
 import { registerReadDbNameRoute } from "./routes/read-db-name.js";
+import { registerSiteStepsRoutes } from "./routes/site-steps.js";
 
 export type BuildAppOptions = {
   /** Injected for tests; production uses `getErpExecutionConnection()`. */
   erpExecutionClient?: ErpExecutionReadDbPort;
+  /** Injected for tests; production builds a `SiteStepsForwarder` from env. */
+  siteStepsForwarder?: SiteStepsForwarderPort;
+  /** Controls legacy Phase-1 route registration (`/provision`, legacy `/sites/create`). */
+  enableProvisionRoutes?: boolean;
+  /** Controls Phase-2 site-step forwarding route registration. */
+  enableSiteStepRoutes?: boolean;
 };
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
+  const enableProvisionRoutes = options.enableProvisionRoutes !== false;
+  const enableSiteStepRoutes = options.enableSiteStepRoutes === true;
   const client =
     options.erpExecutionClient ??
     new ErpExecutionServiceClient({
       ...getErpExecutionConnection(),
     });
+  const siteStepsForwarder =
+    options.siteStepsForwarder ?? new SiteStepsForwarder(getErpExecutionConnection());
 
   const app = Fastify({
     logger: loggerConfig,
@@ -53,7 +66,12 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   await registerHealthRoutes(app);
   await registerReadDbNameRoute(app, client);
-  await registerProvisionRoute(app, client);
+  if (enableProvisionRoutes) {
+    await registerProvisionRoute(app, client);
+  }
+  if (enableSiteStepRoutes) {
+    await registerSiteStepsRoutes(app, siteStepsForwarder);
+  }
 
   return app;
 }
