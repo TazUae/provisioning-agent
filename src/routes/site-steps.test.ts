@@ -30,6 +30,7 @@ const AUTH_HEADER = `Bearer ${process.env.PROVISIONING_API_TOKEN}`;
 type Call =
   | { kind: "createSite"; body: CreateSiteForwardBody; requestId?: string }
   | { kind: "installErp"; body: SiteOnlyForwardBody; requestId?: string }
+  | { kind: "installFitdesk"; body: SiteOnlyForwardBody; requestId?: string }
   | { kind: "enableScheduler"; body: SiteOnlyForwardBody; requestId?: string }
   | { kind: "setupLocale"; body: SetupLocaleForwardBody; requestId?: string }
   | { kind: "setupCompany"; body: SetupCompanyForwardBody; requestId?: string }
@@ -56,6 +57,10 @@ function fakeForwarder(
     },
     installErp: async (body, opts) => {
       calls.push({ kind: "installErp", body, requestId: opts?.requestId });
+      return response;
+    },
+    installFitdesk: async (body, opts) => {
+      calls.push({ kind: "installFitdesk", body, requestId: opts?.requestId });
       return response;
     },
     enableScheduler: async (body, opts) => {
@@ -242,6 +247,94 @@ test("POST /sites/install-erp returns 422 when site is missing", async () => {
     const res = await app.inject({
       method: "POST",
       url: "/sites/install-erp",
+      headers: { "content-type": "application/json", authorization: AUTH_HEADER },
+      payload: JSON.stringify({}),
+    });
+    assert.equal(res.statusCode, 422);
+    const body = res.json() as { ok: boolean; error: { code: string; retryable: boolean } };
+    assert.equal(body.ok, false);
+    assert.equal(body.error.code, "ERP_VALIDATION_FAILED");
+    assert.equal(body.error.retryable, false);
+    assert.equal(calls.length, 0);
+  } finally {
+    await app.close();
+  }
+});
+
+// --- install-fitdesk -----------------------------------------------------
+
+test("POST /sites/install-fitdesk requires Bearer token", async () => {
+  const { forwarder } = fakeForwarder(successEnvelope({ action: "installFitdesk" }));
+  const { buildApp } = await import("../app.js");
+  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  try {
+    const res = await app.inject({
+      method: "POST",
+      url: "/sites/install-fitdesk",
+      headers: { "content-type": "application/json" },
+      payload: JSON.stringify({ site: "acme" }),
+    });
+    assert.equal(res.statusCode, 401);
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /sites/install-fitdesk forwards Phase 2 envelope verbatim", async () => {
+  const upstream = successEnvelope({
+    action: "installFitdesk",
+    site: "acme.example",
+    outcome: "applied",
+  });
+  const { forwarder, calls } = fakeForwarder(upstream);
+  const { buildApp } = await import("../app.js");
+  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  try {
+    const res = await app.inject({
+      method: "POST",
+      url: "/sites/install-fitdesk",
+      headers: { "content-type": "application/json", authorization: AUTH_HEADER },
+      payload: JSON.stringify({ site: "acme.example" }),
+    });
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.json(), upstream.body);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]?.kind, "installFitdesk");
+    if (calls[0]?.kind === "installFitdesk") {
+      assert.equal(calls[0].body.site, "acme.example");
+    }
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /sites/install-fitdesk relays upstream failure status and body", async () => {
+  const upstream = failureEnvelope(503, "INFRA_UNAVAILABLE", "bench-agent unreachable", true);
+  const { forwarder } = fakeForwarder(upstream);
+  const { buildApp } = await import("../app.js");
+  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  try {
+    const res = await app.inject({
+      method: "POST",
+      url: "/sites/install-fitdesk",
+      headers: { "content-type": "application/json", authorization: AUTH_HEADER },
+      payload: JSON.stringify({ site: "acme.example" }),
+    });
+    assert.equal(res.statusCode, 503);
+    assert.deepEqual(res.json(), upstream.body);
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /sites/install-fitdesk returns 422 when site is missing", async () => {
+  const { forwarder, calls } = fakeForwarder(successEnvelope({ action: "installFitdesk" }));
+  const { buildApp } = await import("../app.js");
+  const app = await buildApp({ erpExecutionClient: stubReadDbClient, siteStepsForwarder: forwarder });
+  try {
+    const res = await app.inject({
+      method: "POST",
+      url: "/sites/install-fitdesk",
       headers: { "content-type": "application/json", authorization: AUTH_HEADER },
       payload: JSON.stringify({}),
     });

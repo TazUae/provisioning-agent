@@ -60,6 +60,37 @@ test("installErp posts to /sites/install-erp with Bearer token and JSON body", a
   assert.equal(calls[0]?.init.body, JSON.stringify({ site: "acme" }));
 });
 
+test("installFitdesk posts to /sites/install-fitdesk with Bearer token and JSON body", async () => {
+  const { fetchImpl, calls } = captureFetch(() =>
+    jsonResponse(200, {
+      ok: true,
+      data: { action: "installFitdesk", site: "acme", outcome: "applied" },
+      timestamp: "2026-04-10T00:00:00.000Z",
+    })
+  );
+  const forwarder = new SiteStepsForwarder({
+    baseUrl: "http://erp-execution:8790",
+    token: "remote-token",
+    timeoutMs: 1000,
+    fetchImpl,
+  });
+  const res = await forwarder.installFitdesk({ site: "acme" }, { requestId: "req-1" });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, {
+    ok: true,
+    data: { action: "installFitdesk", site: "acme", outcome: "applied" },
+    timestamp: "2026-04-10T00:00:00.000Z",
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]?.url, "http://erp-execution:8790/sites/install-fitdesk");
+  const headers = calls[0]?.init.headers as Record<string, string>;
+  assert.equal(headers.Authorization, "Bearer remote-token");
+  assert.equal(headers["Content-Type"], "application/json");
+  assert.equal(headers["x-request-id"], "req-1");
+  assert.equal(calls[0]?.init.method, "POST");
+  assert.equal(calls[0]?.init.body, JSON.stringify({ site: "acme" }));
+});
+
 test("siteStatus GETs /sites/:site/status with no body and URL-encodes the site", async () => {
   const { fetchImpl, calls } = captureFetch(() =>
     jsonResponse(200, {

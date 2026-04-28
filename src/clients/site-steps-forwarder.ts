@@ -57,6 +57,10 @@ export class SiteStepsForwarder implements SiteStepsForwarderPort {
     return this.post("/sites/install-erp", body, opts);
   }
 
+  installFitdesk(body: SiteOnlyForwardBody, opts?: { requestId?: string }): Promise<ForwardedResponse> {
+    return this.post("/sites/install-fitdesk", body, opts);
+  }
+
   enableScheduler(body: SiteOnlyForwardBody, opts?: { requestId?: string }): Promise<ForwardedResponse> {
     return this.post("/sites/enable-scheduler", body, opts);
   }

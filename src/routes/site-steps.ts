@@ -161,6 +161,17 @@ export async function registerSiteStepsRoutes(
   );
 
   app.post(
+    "/sites/install-fitdesk",
+    { preHandler: [requireBearerToken] },
+    async (req, reply) => {
+      const parsed = SiteOperationBodySchema.safeParse(req.body);
+      if (!parsed.success) return sendValidationError(reply, parsed.error);
+      const forwarded = await forwarder.installFitdesk(parsed.data, { requestId: req.id });
+      sendForwarded(reply, forwarded);
+    }
+  );
+
+  app.post(
     "/sites/enable-scheduler",
     { preHandler: [requireBearerToken] },
     async (req, reply) => {

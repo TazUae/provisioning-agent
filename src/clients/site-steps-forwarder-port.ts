@@ -112,6 +112,7 @@ export type SetupFitdeskForwardBody = {
 export type SiteStepsForwarderPort = {
   createSite(body: CreateSiteForwardBody, opts?: { requestId?: string }): Promise<ForwardedResponse>;
   installErp(body: SiteOnlyForwardBody, opts?: { requestId?: string }): Promise<ForwardedResponse>;
+  installFitdesk(body: SiteOnlyForwardBody, opts?: { requestId?: string }): Promise<ForwardedResponse>;
   enableScheduler(body: SiteOnlyForwardBody, opts?: { requestId?: string }): Promise<ForwardedResponse>;
   setupLocale(body: SetupLocaleForwardBody, opts?: { requestId?: string }): Promise<ForwardedResponse>;
   setupCompany(body: SetupCompanyForwardBody, opts?: { requestId?: string }): Promise<ForwardedResponse>;
