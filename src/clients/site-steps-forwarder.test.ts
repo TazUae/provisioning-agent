@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { Agent } from "undici";
 import { SiteStepsForwarder } from "./site-steps-forwarder.js";
 
 process.env.PROVISIONING_API_TOKEN =
@@ -58,6 +59,17 @@ test("installErp posts to /sites/install-erp with Bearer token and JSON body", a
   assert.equal(headers["x-request-id"], "req-1");
   assert.equal(calls[0]?.init.method, "POST");
   assert.equal(calls[0]?.init.body, JSON.stringify({ site: "acme" }));
+  assert.ok((calls[0]?.init as RequestInit & { dispatcher?: unknown }).dispatcher instanceof Agent);
+});
+
+test("dispatcher timeout configuration is aligned to timeoutMs", () => {
+  const timeoutMs = 654_321;
+  const forwarder = new SiteStepsForwarder({
+    baseUrl: "http://erp-execution:8790",
+    token: "remote-token",
+    timeoutMs,
+  });
+  assert.equal((forwarder as any).dispatcherTimeoutMs, timeoutMs);
 });
 
 test("installFitdesk posts to /sites/install-fitdesk with Bearer token and JSON body", async () => {

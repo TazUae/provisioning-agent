@@ -1,3 +1,4 @@
+import { Agent } from "undici";
 import type {
   CreateSiteForwardBody,
   ForwardedResponse,
@@ -41,12 +42,19 @@ export class SiteStepsForwarder implements SiteStepsForwarderPort {
   private readonly token: string;
   private readonly timeoutMs: number;
   private readonly fetchImpl: FetchLike;
+  private readonly dispatcher: Agent;
+  private readonly dispatcherTimeoutMs: number;
 
   constructor(config: SiteStepsForwarderConfig) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.token = config.token;
     this.timeoutMs = config.timeoutMs;
     this.fetchImpl = config.fetchImpl ?? fetch;
+    this.dispatcherTimeoutMs = this.timeoutMs;
+    this.dispatcher = new Agent({
+      headersTimeout: this.dispatcherTimeoutMs,
+      bodyTimeout: this.dispatcherTimeoutMs,
+    });
   }
 
   createSite(body: CreateSiteForwardBody, opts?: { requestId?: string }): Promise<ForwardedResponse> {
@@ -144,6 +152,7 @@ export class SiteStepsForwarder implements SiteStepsForwarderPort {
         headers,
         body: method === "POST" && body !== undefined ? JSON.stringify(body) : undefined,
         signal: controller.signal,
+        dispatcher: this.dispatcher,
       });
       const text = await response.text();
       return { status: response.status, body: tryParseJson(text) };
