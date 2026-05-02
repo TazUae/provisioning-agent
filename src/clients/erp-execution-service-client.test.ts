@@ -150,6 +150,7 @@ test("provisionSite POSTs flat JSON once to /sites/create and aggregates one ste
       siteName: "acme",
       domain: "acme.example.test",
       apiUsername: "cp_acme",
+      adminPassword: "super-secret-admin-password",
     });
     assert.equal(opts.headers["Content-Type"], "application/json");
     assert.ok(opts.headers.Authorization?.startsWith("Bearer "));
@@ -168,6 +169,7 @@ test("provisionSite POSTs flat JSON once to /sites/create and aggregates one ste
     site_name: "acme",
     domain: "acme.example.test",
     api_username: "cp_acme",
+    admin_password: "super-secret-admin-password",
   });
   assert.equal(calls, 1);
   assert.equal(result.ok, true);
@@ -194,6 +196,7 @@ test("provisionSite includes db_name from metadata when legacy dbName is used", 
     site_name: "legacy",
     domain: "legacy.example.test",
     api_username: "cp_legacy",
+    admin_password: "super-secret-admin-password",
   });
   assert.equal(result.ok, true);
   if (result.ok) {

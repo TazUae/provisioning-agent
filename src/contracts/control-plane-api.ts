@@ -72,10 +72,11 @@ export const ReadDbNameRequestSchema = z.object({
 
 export type ReadDbNameRequest = z.infer<typeof ReadDbNameRequestSchema>;
 
-/** Provision: executor expects site, domain, and API user — forwarded as-is to `POST /sites/create`. */
+/** Provision: executor expects site, domain, API user, and admin password. */
 export const ProvisionRequestSchema = ReadDbNameRequestSchema.extend({
   domain: z.string().trim().min(1),
   api_username: z.string().trim().min(1),
+  admin_password: z.string().min(1),
 });
 
 export type ProvisionRequest = z.infer<typeof ProvisionRequestSchema>;

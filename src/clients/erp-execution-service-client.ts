@@ -209,10 +209,15 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
     let siteName: string;
     let domain: string;
     let apiUsername: string;
+    let adminPassword: string;
     try {
       siteName = normalizeOpaqueSiteString(body.site_name);
       domain = validateDomain(body.domain.trim());
       apiUsername = validateUsername(body.api_username.trim());
+      adminPassword = body.admin_password;
+      if (adminPassword.length === 0) {
+        throw new Error("admin_password must not be empty");
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return {
@@ -234,7 +239,7 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
       };
     }
 
-    const payload = { siteName, domain, apiUsername };
+    const payload = { siteName, domain, apiUsername, adminPassword };
     const url = `${this.baseUrl}/sites/create`;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -244,7 +249,7 @@ export class ErpExecutionServiceClient implements ErpExecutionReadDbPort {
 
     let data: unknown;
     try {
-      console.log("➡️ CALLING EXECUTION SERVICE", { url, payload });
+      console.log("➡️ CALLING EXECUTION SERVICE", { url, siteName, domain, apiUsername });
 
       const response = await this.postSitesCreateImpl(url, payload, {
         timeout: this.timeoutMs,
