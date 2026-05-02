@@ -1,5 +1,4 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { z } from "zod";
 import type { ErpExecutionReadDbPort } from "../clients/erp-execution-read-db-port.js";
 import {
   ProvisionRequestSchema,
@@ -9,13 +8,6 @@ import { isExecutionServiceFailure } from "../clients/erp-execution-service-clie
 import { requireBearerToken } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { sendPublicError, sendPublicSuccessProvision } from "../lib/public-api-response.js";
-
-const SitesCreateCompatSchema = z.object({
-  siteName: z.string().trim().min(1).max(2048),
-  domain: z.string().trim().min(1),
-  apiUsername: z.string().trim().min(1),
-  adminPassword: z.string().min(1),
-});
 
 async function runProvisionRequest(
   client: ErpExecutionReadDbPort,
@@ -119,45 +111,6 @@ export async function registerProvisionRoute(
       }
 
       await runProvisionRequest(client, req, reply, parsed.data);
-    }
-  );
-
-  app.post(
-    "/sites/create",
-    { preHandler: [requireBearerToken] },
-    async (req, reply) => {
-      const parsed = SitesCreateCompatSchema.safeParse(req.body);
-      if (!parsed.success) {
-        const first = parsed.error.issues[0];
-        const message = first?.message ?? "Invalid request body";
-        sendPublicError(reply, "VALIDATION_ERROR", message, 400);
-        return;
-      }
-      logger.info(
-        {
-          siteName: parsed.data.siteName,
-          domain: parsed.data.domain,
-          apiUsername: parsed.data.apiUsername,
-        },
-        "Incoming /sites/create request"
-      );
-
-      const provisionCandidate = {
-        site_name: parsed.data.siteName,
-        domain: parsed.data.domain,
-        api_username: parsed.data.apiUsername,
-        admin_password: parsed.data.adminPassword,
-      };
-
-      const provisionParsed = ProvisionRequestSchema.safeParse(provisionCandidate);
-      if (!provisionParsed.success) {
-        const first = provisionParsed.error.issues[0];
-        const message = first?.message ?? "Invalid request body";
-        sendPublicError(reply, "VALIDATION_ERROR", message, 400);
-        return;
-      }
-
-      await runProvisionRequest(client, req, reply, provisionParsed.data);
     }
   );
 }

@@ -18,7 +18,7 @@ export type BuildAppOptions = {
   erpExecutionClient?: ErpExecutionReadDbPort;
   /** Injected for tests; production builds a `SiteStepsForwarder` from env. */
   siteStepsForwarder?: SiteStepsForwarderPort;
-  /** Controls legacy Phase-1 route registration (`/provision`, legacy `/sites/create`). */
+  /** Controls legacy Phase-1 route registration (`/provision`). */
   enableProvisionRoutes?: boolean;
   /** Controls Phase-2 site-step forwarding route registration. */
   enableSiteStepRoutes?: boolean;
@@ -26,7 +26,7 @@ export type BuildAppOptions = {
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
   const enableProvisionRoutes = options.enableProvisionRoutes !== false;
-  const enableSiteStepRoutes = options.enableSiteStepRoutes === true;
+  const enableSiteStepRoutes = options.enableSiteStepRoutes !== false;
   const client =
     options.erpExecutionClient ??
     new ErpExecutionServiceClient({
