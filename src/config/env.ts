@@ -7,7 +7,7 @@ const EnvSchema = z.object({
   PROVISIONING_API_TOKEN: z.string().min(16),
   ERP_REMOTE_BASE_URL: z.string().trim().url(),
   ERP_REMOTE_TOKEN: z.string().trim().min(1),
-  ERP_REMOTE_TIMEOUT_MS: z.coerce.number().int().min(1).max(300_000).default(15000),
+  ERP_REMOTE_TIMEOUT_MS: z.coerce.number().int().min(1).max(1_800_000).default(15000),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
