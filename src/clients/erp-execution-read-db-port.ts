@@ -19,6 +19,7 @@ export type ProvisionSiteRequestBody = {
   site_name: string;
   domain: string;
   api_username: string;
+  admin_password: string;
 };
 
 /** Minimal dependency for ERP execution HTTP routes (test doubles implement this). */

@@ -131,6 +131,7 @@ test("POST /provision returns success contract", async () => {
       site_name: "acme",
       domain: "acme.example.com",
       api_username: "cp_acme",
+      admin_password: "super-secret-admin-password",
     }),
   });
   assert.equal(res.statusCode, 200);
@@ -152,6 +153,7 @@ test("POST /sites/create maps camelCase to provision contract and returns succes
       assert.equal(body.site_name, "acme");
       assert.equal(body.domain, "acme.example.com");
       assert.equal(body.api_username, "cp_acme");
+      assert.equal(body.admin_password, "super-secret-admin-password");
       return {
         ok: true,
         data: {
@@ -175,6 +177,7 @@ test("POST /sites/create maps camelCase to provision contract and returns succes
       siteName: "acme",
       domain: "acme.example.com",
       apiUsername: "cp_acme",
+      adminPassword: "super-secret-admin-password",
     }),
   });
   assert.equal(res.statusCode, 200);
@@ -206,6 +209,7 @@ test("POST /provision without Bearer returns AUTH_ERROR", async () => {
       site_name: "acme",
       domain: "acme.example.com",
       api_username: "cp_acme",
+      admin_password: "super-secret-admin-password",
     }),
   });
   assert.equal(res.statusCode, 401);

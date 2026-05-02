@@ -14,6 +14,7 @@ const SitesCreateCompatSchema = z.object({
   siteName: z.string().trim().min(1).max(2048),
   domain: z.string().trim().min(1),
   apiUsername: z.string().trim().min(1),
+  adminPassword: z.string().min(1),
 });
 
 async function runProvisionRequest(
@@ -97,8 +98,14 @@ export async function registerProvisionRoute(
     async (req, reply) => {
       logger.info(
         {
-          body: req.body,
-          headers: req.headers,
+          body:
+            req.body && typeof req.body === "object"
+              ? {
+                  site_name: (req.body as Record<string, unknown>).site_name,
+                  domain: (req.body as Record<string, unknown>).domain,
+                  api_username: (req.body as Record<string, unknown>).api_username,
+                }
+              : null,
         },
         "Incoming create site request"
       );
@@ -119,8 +126,6 @@ export async function registerProvisionRoute(
     "/sites/create",
     { preHandler: [requireBearerToken] },
     async (req, reply) => {
-      logger.info({ body: req.body }, "Incoming /sites/create request");
-
       const parsed = SitesCreateCompatSchema.safeParse(req.body);
       if (!parsed.success) {
         const first = parsed.error.issues[0];
@@ -128,11 +133,20 @@ export async function registerProvisionRoute(
         sendPublicError(reply, "VALIDATION_ERROR", message, 400);
         return;
       }
+      logger.info(
+        {
+          siteName: parsed.data.siteName,
+          domain: parsed.data.domain,
+          apiUsername: parsed.data.apiUsername,
+        },
+        "Incoming /sites/create request"
+      );
 
       const provisionCandidate = {
         site_name: parsed.data.siteName,
         domain: parsed.data.domain,
         api_username: parsed.data.apiUsername,
+        admin_password: parsed.data.adminPassword,
       };
 
       const provisionParsed = ProvisionRequestSchema.safeParse(provisionCandidate);

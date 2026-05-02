@@ -17,6 +17,7 @@ import type {
 } from "./site-steps-forwarder-port.js";
 
 type FetchLike = typeof fetch;
+type FetchInitWithDispatcher = RequestInit & { dispatcher?: Agent };
 
 export type SiteStepsForwarderConfig = {
   baseUrl: string;
@@ -147,13 +148,14 @@ export class SiteStepsForwarder implements SiteStepsForwarderPort {
     };
 
     try {
-      const response = await this.fetchImpl(url, {
+      const init: FetchInitWithDispatcher = {
         method,
         headers,
         body: method === "POST" && body !== undefined ? JSON.stringify(body) : undefined,
         signal: controller.signal,
         dispatcher: this.dispatcher,
-      });
+      };
+      const response = await this.fetchImpl(url, init);
       const text = await response.text();
       return { status: response.status, body: tryParseJson(text) };
     } catch (error) {
