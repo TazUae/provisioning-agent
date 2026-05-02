@@ -567,7 +567,12 @@ test("GET /sites/:site/status relays upstream 504 timeout body", async () => {
 // --- create-site ---------------------------------------------------------
 
 test("POST /sites/create forwards Phase 2 envelope verbatim including adminPassword", async () => {
-  const upstream = successEnvelope({ action: "createSite", site: "acme", outcome: "applied" });
+  const upstream = successEnvelope({
+    action: "createSite",
+    site: "acme",
+    outcome: "applied",
+    dbName: "_tenant_acme",
+  });
   const { forwarder, calls } = fakeForwarder(upstream);
   const { buildApp } = await import("../app.js");
   const app = await buildApp({
@@ -596,6 +601,48 @@ test("POST /sites/create forwards Phase 2 envelope verbatim including adminPassw
       assert.equal(calls[0].body.siteName, "acme");
       assert.equal(calls[0].body.adminPassword, "random-generated-64hex");
     }
+  } finally {
+    await app.close();
+  }
+});
+
+test("POST /sites/create accepts Phase-2 envelope without legacy durationMs metadata shape", async () => {
+  const upstream: ForwardedResponse = {
+    status: 200,
+    body: {
+      ok: true,
+      data: {
+        action: "createSite",
+        site: "acme",
+        outcome: "already_done",
+        alreadyExists: true,
+        dbName: "_tenant_acme",
+      },
+      timestamp: "2026-04-10T00:00:00.000Z",
+    },
+  };
+  const { forwarder } = fakeForwarder(upstream);
+  const { buildApp } = await import("../app.js");
+  const app = await buildApp({
+    erpExecutionClient: stubReadDbClient,
+    siteStepsForwarder: forwarder,
+    enableProvisionRoutes: false,
+    enableSiteStepRoutes: true,
+  });
+  try {
+    const res = await app.inject({
+      method: "POST",
+      url: "/sites/create",
+      headers: { "content-type": "application/json", authorization: AUTH_HEADER },
+      payload: JSON.stringify({
+        siteName: "acme",
+        domain: "acme.example.com",
+        apiUsername: "cp_acme",
+        adminPassword: "random-generated-64hex",
+      }),
+    });
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.json(), upstream.body);
   } finally {
     await app.close();
   }

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { ErpExecutionReadDbPort } from "../clients/erp-execution-read-db-port.js";
+import type { SiteStepsForwarderPort } from "../clients/site-steps-forwarder-port.js";
 
 process.env.PROVISIONING_API_TOKEN ??= "test-provisioning-token-phase1-routes";
 process.env.ERP_REMOTE_BASE_URL ??= "http://127.0.0.1:18080";
@@ -146,26 +147,51 @@ test("POST /provision returns success contract", async () => {
   await app.close();
 });
 
-test("POST /sites/create maps camelCase to provision contract and returns success", async () => {
+test("POST /sites/create uses Phase-2 forwarder and returns envelope verbatim", async () => {
   const mock: ErpExecutionReadDbPort = {
     readDbName: async () => ({ ok: true, dbName: "x" }),
-    provisionSite: async (body) => {
-      assert.equal(body.site_name, "acme");
-      assert.equal(body.domain, "acme.example.com");
-      assert.equal(body.api_username, "cp_acme");
-      assert.equal(body.admin_password, "super-secret-admin-password");
+    provisionSite: async () => ({
+      ok: true,
+      data: { site_name: "legacy-not-used", steps: [] },
+    }),
+  };
+  const calls: Array<{ siteName: string; domain: string; apiUsername: string; adminPassword: string }> = [];
+  const forwarder: SiteStepsForwarderPort = {
+    createSite: async (body) => {
+      calls.push(body);
       return {
-        ok: true,
-        data: {
-          site_name: "acme",
-          steps: [{ action: "createSite", durationMs: 10 }],
-          db_name: "_tenant_acme",
+        status: 200,
+        body: {
+          ok: true,
+          data: {
+            action: "createSite",
+            site: body.siteName,
+            outcome: "applied",
+            dbName: "_tenant_acme",
+          },
+          timestamp: "2026-05-02T00:00:00.000Z",
         },
       };
     },
+    installErp: async () => ({ status: 500, body: { ok: false } }),
+    installFitdesk: async () => ({ status: 500, body: { ok: false } }),
+    enableScheduler: async () => ({ status: 500, body: { ok: false } }),
+    setupLocale: async () => ({ status: 500, body: { ok: false } }),
+    setupCompany: async () => ({ status: 500, body: { ok: false } }),
+    setupComplete: async () => ({ status: 500, body: { ok: false } }),
+    setupFiscalYear: async () => ({ status: 500, body: { ok: false } }),
+    setupGlobalDefaults: async () => ({ status: 500, body: { ok: false } }),
+    setupRegional: async () => ({ status: 500, body: { ok: false } }),
+    setupDomains: async () => ({ status: 500, body: { ok: false } }),
+    setupRoles: async () => ({ status: 500, body: { ok: false } }),
+    addDomain: async () => ({ status: 500, body: { ok: false } }),
+    createApiUser: async () => ({ status: 500, body: { ok: false } }),
+    smokeTest: async () => ({ status: 500, body: { ok: false } }),
+    setupFitdesk: async () => ({ status: 500, body: { ok: false } }),
+    siteStatus: async () => ({ status: 500, body: { ok: false } }),
   };
   const { buildApp } = await import("../app.js");
-  const app = await buildApp({ erpExecutionClient: mock });
+  const app = await buildApp({ erpExecutionClient: mock, siteStepsForwarder: forwarder });
   const res = await app.inject({
     method: "POST",
     url: "/sites/create",
@@ -182,12 +208,17 @@ test("POST /sites/create maps camelCase to provision contract and returns succes
   });
   assert.equal(res.statusCode, 200);
   const body = JSON.parse(res.body) as {
-    success: boolean;
-    data: { site_name: string; db_name?: string };
+    ok: boolean;
+    data: { action: string; site: string; outcome: string; dbName?: string };
   };
-  assert.equal(body.success, true);
-  assert.equal(body.data.site_name, "acme");
-  assert.equal(body.data.db_name, "_tenant_acme");
+  assert.equal(body.ok, true);
+  assert.equal(body.data.action, "createSite");
+  assert.equal(body.data.site, "acme");
+  assert.equal(body.data.outcome, "applied");
+  assert.equal(body.data.dbName, "_tenant_acme");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]?.siteName, "acme");
+  assert.equal(calls[0]?.adminPassword, "super-secret-admin-password");
   await app.close();
 });
 
