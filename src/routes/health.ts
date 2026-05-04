@@ -1,13 +1,15 @@
 import type { FastifyInstance } from "fastify";
-import { sendPublicSuccessHealth } from "../lib/public-api-response.js";
 
 /**
- * Liveness probe: returns only `{ success, data: { status } }` — no secrets or dependency details.
- *
- * TODO: Restrict access or move behind internal network (load balancer / mesh policy).
+ * Liveness probe. Returns the control-plane envelope format:
+ *   { ok: true, data: { status, service }, timestamp }
  */
 export async function registerHealthRoutes(app: FastifyInstance): Promise<void> {
   app.get("/health", async (_req, reply) => {
-    sendPublicSuccessHealth(reply);
+    void reply.code(200).send({
+      ok: true,
+      data: { status: "ok", service: "provisioning-agent" },
+      timestamp: new Date().toISOString(),
+    });
   });
 }

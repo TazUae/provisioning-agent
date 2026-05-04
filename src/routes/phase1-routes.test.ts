@@ -19,9 +19,15 @@ test("GET /health returns stable success contract", async () => {
   const app = await buildApp({ erpExecutionClient: mock });
   const res = await app.inject({ method: "GET", url: "/health" });
   assert.equal(res.statusCode, 200);
-  const body = JSON.parse(res.body) as { success: boolean; data: { status: string } };
-  assert.equal(body.success, true);
+  const body = JSON.parse(res.body) as {
+    ok: boolean;
+    data: { status: string; service: string };
+    timestamp: string;
+  };
+  assert.equal(body.ok, true);
   assert.equal(body.data.status, "ok");
+  assert.equal(body.data.service, "provisioning-agent");
+  assert.equal(Number.isNaN(Date.parse(body.timestamp)), false);
   await app.close();
 });
 
